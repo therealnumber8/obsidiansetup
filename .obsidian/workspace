@@ -1,0 +1,88 @@
+{
+  "main": {
+    "id": "e5e43be663ef98d3",
+    "type": "split",
+    "children": [
+      {
+        "id": "52f9d9e2478044df",
+        "type": "leaf",
+        "state": {
+          "type": "markdown",
+          "state": {
+            "file": "23.10.2023 physics 1.md",
+            "mode": "source",
+            "source": false
+          }
+        }
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "d04e3718677e0483",
+    "type": "mobile-drawer",
+    "children": [
+      {
+        "id": "1a30af51ecb9950c",
+        "type": "leaf",
+        "state": {
+          "type": "file-explorer",
+          "state": {}
+        }
+      },
+      {
+        "id": "d4e8eb107a0f67ea",
+        "type": "leaf",
+        "state": {
+          "type": "search",
+          "state": {
+            "query": "",
+            "matchingCase": false,
+            "explainSearch": false,
+            "collapseAll": false,
+            "extraContext": false,
+            "sortOrder": "alphabetical"
+          }
+        }
+      }
+    ],
+    "currentTab": 0
+  },
+  "right": {
+    "id": "3425a9c447b2799f",
+    "type": "mobile-drawer",
+    "children": [
+      {
+        "id": "f9c39d287f2556f3",
+        "type": "leaf",
+        "state": {
+          "type": "backlink",
+          "state": {
+            "file": "23.10.2023 physics 1.md",
+            "collapseAll": false,
+            "extraContext": false,
+            "sortOrder": "alphabetical",
+            "showSearch": false,
+            "searchQuery": "",
+            "backlinkCollapsed": false,
+            "unlinkedCollapsed": true
+          }
+        }
+      }
+    ],
+    "currentTab": 0
+  },
+  "active": "52f9d9e2478044df",
+  "lastOpenFiles": [
+    "To delete later/Untitled.md",
+    "Storage/Instagram browse log.md",
+    "Storage/To get sometime.md",
+    "Journal/Daily Journal/2022-03-26.md",
+    "Knowledge/To learn more about.md",
+    "In Sight/Passion programs.md",
+    "Health/Skincare.md",
+    "Storage/Hierarchy of Scientific Evidence.md",
+    "From Coding/Data science resources.md",
+    "From Coding/Clement notes.md"
+  ]
+}

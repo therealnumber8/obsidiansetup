@@ -1,0 +1,5 @@
+.life-calendar .markdown-preview-sizer,
+.life-calendar p a.internal-link {
+  max-width: unset !important; /* This will apply to .markdown-preview-sizer within .life-calendar */
+  display: inline-block; /* This will apply to a.internal-link within p within .life-calendar */
+}

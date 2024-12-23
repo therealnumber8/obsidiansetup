@@ -1,0 +1,11 @@
+{
+  "enabledCssSnippets": [
+    "LifeCalendar",
+    "custom-spacing",
+    "animatons",
+    "Table_space",
+    "hidefrontmatter",
+    "extended-colorschemes"
+  ],
+  "cssTheme": "Shimmering Focus"
+}

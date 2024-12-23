@@ -1,0 +1,34 @@
+{
+  "showGettingStartedBanner": true,
+  "hasMigratedDailyNoteSettings": false,
+  "hasMigratedWeeklyNoteSettings": false,
+  "daily": {
+    "format": "[Daily Note of] DD-MM-YYYY",
+    "template": "0. Main Storage 🟡/4. Hoard 🟡/Folders/Plugins/Periodic Notes/My Daily Note Template.md",
+    "folder": "6. Journal 🟡/Daily",
+    "enabled": true
+  },
+  "weekly": {
+    "format": "[Weekly Note Week] WW, YYYY",
+    "template": "0. Main Storage 🟡/4. Hoard 🟡/Folders/Plugins/Periodic Notes/My Weekly Note Template.md",
+    "folder": "6. Journal 🟡/Weekly",
+    "enabled": true
+  },
+  "monthly": {
+    "format": "[Monthly Note of]  MMMM, YYYY",
+    "template": "0. Main Storage 🟡/4. Hoard 🟡/Folders/Plugins/Periodic Notes/My Monthly Note Template.md",
+    "folder": "6. Journal 🟡/Monthly",
+    "enabled": true
+  },
+  "quarterly": {
+    "format": "",
+    "template": "",
+    "folder": ""
+  },
+  "yearly": {
+    "format": "[Yearly Note of] YYYY ",
+    "template": "0. Main Storage 🟡/4. Hoard 🟡/Folders/Plugins/Periodic Notes/My Yearly Note Template.md",
+    "folder": "6. Journal 🟡/Yearly",
+    "enabled": true
+  }
+}
