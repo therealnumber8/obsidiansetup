@@ -1,0 +1,20 @@
+{
+  "mobileToolbarCommands": [
+    "editor:attach-file",
+    "editor:undo",
+    "editor:redo",
+    "editor:swap-line-down",
+    "editor:swap-line-up",
+    "cmdr:macro-0",
+    "cmdr:macro-1",
+    "cmdr:macro-2",
+    "editor:open-search"
+  ],
+  "spellcheck": false,
+  "mobileQuickRibbonItem": "command-palette:Open command palette",
+  "mobilePullAction": "omnisearch:show-modal",
+  "showInlineTitle": false,
+  "showRibbon": false,
+  "attachmentFolderPath": "0. Main Storage 🟡/0. Obsidian 🟡/Attachments",
+  "showIndentGuide": false
+}

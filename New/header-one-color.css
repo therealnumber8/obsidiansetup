@@ -1,0 +1,63 @@
+/* Fix header to maintain consistent appearance with specific color */
+.view-header {
+    background: #1a1c23 !important;
+    height: var(--header-height);
+    display: flex;
+    border-bottom: var(--file-header-border);
+    z-index: 1;
+    position: relative;
+    gap: var(--size-4-2);
+    padding: 0 var(--size-4-3);
+}
+
+/* Ensure consistent background across all states */
+.workspace-leaf.mod-active .view-header,
+.workspace-leaf:not(.mod-active) .view-header {
+    background: #1a1c23 !important;
+}
+
+/* Maintain consistent styling for header elements */
+.view-header-title-container {
+    opacity: 1 !important;
+}
+
+.view-header-title {
+    color: var(--text-normal);
+    opacity: 1 !important;
+}
+
+.view-header-breadcrumb {
+    color: var(--text-muted);
+    opacity: 1 !important;
+}
+
+.view-header-breadcrumb-separator {
+    color: var(--text-muted);
+    opacity: 1 !important;
+}
+
+/* Style the buttons consistently */
+.view-header .clickable-icon {
+    color: var(--text-muted);
+    opacity: var(--icon-opacity);
+    border-radius: var(--clickable-icon-radius);
+}
+
+.view-header .clickable-icon:hover {
+    color: var(--text-normal);
+    opacity: var(--icon-opacity-hover);
+    background-color: var(--background-modifier-hover);
+}
+
+/* Keep nav buttons and actions consistent */
+.view-header-nav-buttons,
+.view-actions {
+    opacity: 1 !important;
+}
+
+/* SVG icons consistency */
+.view-header .svg-icon {
+    stroke-width: var(--icon-stroke);
+    width: var(--icon-size);
+    height: var(--icon-size);
+}
