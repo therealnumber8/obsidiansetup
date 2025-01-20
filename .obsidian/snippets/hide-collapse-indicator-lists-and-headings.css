@@ -1,0 +1,4 @@
+/* Hide the collapse indicator in editing mode */
+div.collapse-indicator.collapse-icon {
+    display: none !important;
+}

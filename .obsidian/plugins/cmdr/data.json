@@ -1,0 +1,73 @@
+{
+  "confirmDeletion": false,
+  "showAddCommand": false,
+  "debug": false,
+  "editorMenu": [],
+  "fileMenu": [],
+  "leftRibbon": [],
+  "rightRibbon": [],
+  "titleBar": [],
+  "statusBar": [],
+  "pageHeader": [],
+  "macros": [
+    {
+      "macro": [
+        {
+          "action": 0,
+          "commandId": "obsidian-collapse-all-plugin:collapse-file-explorer"
+        },
+        {
+          "action": 0,
+          "commandId": "file-explorer:reveal-active-file"
+        }
+      ],
+      "name": "Collapso",
+      "icon": "locate",
+      "startup": false
+    },
+    {
+      "macro": [
+        {
+          "action": 0,
+          "commandId": "obsidian-collapse-all-plugin:toggle-file-explorer"
+        },
+        {
+          "action": 0,
+          "commandId": "obsidian-collapse-all-plugin:toggle-file-explorer"
+        }
+      ],
+      "name": "Collapingso",
+      "icon": "star",
+      "startup": false
+    }
+  ],
+  "explorer": [],
+  "hide": {
+    "statusbar": [],
+    "leftRibbon": []
+  },
+  "spacing": "8",
+  "advancedToolbar": {
+    "rowHeight": 48,
+    "rowCount": 1,
+    "spacing": 0,
+    "buttonWidth": 38,
+    "columnLayout": true,
+    "mappedIcons": [
+      {
+        "commandID": "url-into-selection:paste-url-into-selection",
+        "iconID": "external-link"
+      },
+      {
+        "commandID": "obsidian-advanced-uri:copy-uri-current-file-simple",
+        "iconID": "lucide-link"
+      },
+      {
+        "commandID": "cmdr:macro-0",
+        "iconID": "anchor"
+      }
+    ],
+    "tooltips": false,
+    "heightOffset": 0
+  }
+}

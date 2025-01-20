@@ -1,0 +1,21 @@
+.workspace-leaf,
+.workspace-tab-header-container,
+.workspace-tab-container {
+  background: none;
+  background-color: none !important;
+}
+
+
+:not(.is-popout-window) .workspace-split.mod-root {
+  background: none;
+}
+
+body:not(.is-popout-window) .workspace-split.mod-root .view-content,
+body:not(.is-popout-window) .workspace-split.mod-root .view-header {
+  background: none !important;
+}
+
+
+.view-header-title-container:not(.mod-at-end):after {
+  background: none !important;
+}

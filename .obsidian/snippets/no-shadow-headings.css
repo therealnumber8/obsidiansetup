@@ -1,0 +1,7 @@
+/* Removes the background rectangle behind headings */
+body:not(.no-heading-background) .markdown-preview-view :is(h1, h2, h3, h4, h5, h6),
+body:not(.no-heading-background) .markdown-source-view .cm-line.HyperMD-header {
+    background-color: transparent !important;
+    border: none !important;
+    padding-left: 0 !important;
+}

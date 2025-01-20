@@ -1,0 +1,260 @@
+/* Tags that are emphasized when used inline (not in the YAML frontmatter). 
+	They are meant as visual guides for literature notes. They include: 
+	`#agree`, `#critique`, `#data`, `#definition`, 
+	`#disagree`, `#epistemic-break`, `#example`, `#gap`,
+	`#goal`, `#hypothesis`, `#idea`, `#important`, 
+	`#litreview`, `#main`, `#method`, `#question`, 
+	`#quote`, `#sidenote`. `#summary`, `#todo`, 
+
+	REQUIRED Obsidian installer version 1.5.3 or higher */
+/* ──────────────────────────────────────────────────────────────────── */
+
+.tag:is(
+		[href="#agree"],
+		[href="#critique"],
+		[href="#data"],
+		[href="#definition"],
+		[href="#disagree"],
+		[href="#epistemic-break"],
+		[href="#example"],
+		[href="#gap"],
+		[href="#goal"],
+		[href="#hypothesis"],
+		[href="#idea"],
+		[href="#important"],
+		[href="#litreview"],
+		[href="#main"],
+		[href="#method"],
+		[href="#question"],
+		[href="#quote"],
+		[href="#sidenote"],
+		[href="#summary"],
+		[href="#todo"]
+	),
+.cm-s-obsidian
+	.cm-line
+	span:is(
+		.cm-tag-agree,
+		.cm-tag-critique,
+		.cm-tag-data,
+		.cm-tag-definition,
+		.cm-tag-disagree,
+		.cm-tag-epistemic-break,
+		.cm-tag-example,
+		.cm-tag-gap,
+		.cm-tag-goal,
+		.cm-tag-hypothesis,
+		.cm-tag-idea,
+		.cm-tag-important,
+		.cm-tag-litreview,
+		.cm-tag-main,
+		.cm-tag-method,
+		.cm-tag-question,
+		.cm-tag-quote,
+		.cm-tag-sidenote,
+		.cm-tag-summary,
+		.cm-tag-todo
+	) {
+	/* stylelint-disable-next-line no-unknown-custom-properties */
+	border-radius: var(--tag-radius);
+	color: hsl(0 0% 100%);
+	font-weight: 700;
+	padding-right: 6px;
+	padding-left: 6px;
+	white-space: nowrap;
+
+	/* the "#" */
+	&.cm-hashtag-begin {
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+		padding-right: 2px;
+	}
+
+	/* the tag text */
+	&.cm-hashtag-end {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+}
+
+/* ────────────────────────────────────────────────────────────────────────── */
+
+.cm-tag-agree,
+.tag[href="#agree"] {
+	background-color: hsl(141 71% 48%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ✅";
+	}
+}
+
+.cm-tag-critique,
+.tag[href="#critique"] {
+	background-color: hsl(330 60% 50% / 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ☝️";
+	}
+}
+
+.cm-tag-data,
+.tag[href="#data"] {
+	background-color: hsl(32 44% 46%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 💡";
+	}
+}
+
+.cm-tag-definition,
+.tag[href="#definition"] {
+	background-color: hsl(48 65% 58%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 💡";
+	}
+}
+
+.cm-tag-disagree,
+.tag[href="#disagree"] {
+	background-color: hsl(348 100% 61%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ⛔️";
+	}
+}
+
+.cm-tag-epistemic-break,
+.tag[href="#epistemic-break"] {
+	background-color: hsl(0 0% 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ⚡️";
+	}
+}
+
+.cm-tag-example,
+.tag[href="#example"] {
+	background-color: hsl(289 97% 75%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ⚛️";
+	}
+}
+
+.cm-tag-gap,
+.tag[href="#gap"] {
+	background-color: hsl(0 0% 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 🕳";
+	}
+}
+
+.cm-tag-goal,
+.tag[href="#goal"] {
+	background-color: hsl(178 100% 30% / 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 🏁";
+	}
+}
+
+.cm-tag-hypothesis,
+.tag[href="#hypothesis"] {
+	background-color: hsl(204 86% 40%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ⏺";
+	}
+}
+
+.cm-tag-idea,
+.tag[href="#idea"] {
+	background-color: hsl(86 100% 51% / 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 🤔";
+	}
+}
+
+.cm-tag-important,
+.tag[href="#important"] {
+	background-color: hsl(26 100% 53%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 📌";
+	}
+}
+
+.cm-tag-litreview,
+.tag[href="#litreview"] {
+	background-color: hsl(0 0% 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 📚";
+	}
+}
+
+.cm-tag-main,
+.tag[href="#main"] {
+	background-color: hsl(204 86% 40%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 👉";
+	}
+}
+
+.cm-tag-method,
+.tag[href="#method"] {
+	background-color: hsl(32 44% 46%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 🔬";
+	}
+}
+
+.cm-tag-question,
+.tag[href="#question"] {
+	background-color: hsl(178 100% 30% / 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ❓";
+	}
+}
+
+.cm-tag-quote,
+.tag[href="#quote"] {
+	background-color: hsl(86 100% 51% / 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " 💬";
+	}
+}
+
+.cm-tag-sidenote,
+.tag[href="#sidenote"] {
+	background-color: hsl(0 0% 50%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ⬅️";
+	}
+}
+
+.cm-tag-summary,
+.tag[href="#summary"] {
+	background-color: hsl(26 100% 53%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ✴️";
+	}
+}
+
+.cm-tag-todo,
+.tag[href="#todo"] {
+	background-color: hsl(204 86% 40%);
+
+	&:is(.cm-hashtag-end, .tag)::after {
+		content: " ☑️";
+	}
+}

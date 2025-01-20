@@ -1,0 +1,6 @@
+/* Hide the ::before pseudo-elements for both list lines and active lines in editing mode */
+div.cm-active.HyperMD-list-line.HyperMD-list-line-1.cm-line::before,
+div.cm-active.cm-line::before {
+    content: none !important;
+    display: none !important;
+}

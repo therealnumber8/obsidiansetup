@@ -1,0 +1,27 @@
+RewriteEngine On
+
+# Enable mod_rewrite
+<IfModule mod_rewrite.c>
+    # Rewrite API requests to api/index.php
+    RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+
+    # Rewrite note requests without '.html' to the actual .html file
+    RewriteCond %{REQUEST_FILENAME} .*/notes/.*
+    RewriteCond %{REQUEST_FILENAME}.html -f
+    RewriteRule !.*\.html$ %{REQUEST_FILENAME}.html [L]
+
+    # Fallback for other requests
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+# PHP configuration for buildpacks
+<IfModule mod_php.c>
+    php_value display_errors Off
+    php_value log_errors On
+    php_value error_log /tmp/php_errors.log
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+</IfModule>
+

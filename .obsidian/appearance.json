@@ -1,0 +1,12 @@
+{
+  "enabledCssSnippets": [
+    "Table_space",
+    "hidefrontmatter",
+    "bullet-indent",
+    "bullet-spacing",
+    "hide-collapse-indicator-lists-and-headings",
+    "hide-active-line",
+    "no-shadow-headings"
+  ],
+  "cssTheme": "Shimmering Focus"
+}
