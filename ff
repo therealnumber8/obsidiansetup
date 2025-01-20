@@ -1,0 +1,11 @@
+ff() { find . -type f -iname "*$1*"; }
+
+# for folder only with interactive
+f() { 
+    dir=$(find . -type d -iname "*$1*" | fzf --prompt="Select a directory: ")
+    if [ -n "$dir" ]; then
+        cd "$dir" && echo "Now in $(pwd)"
+    else
+        echo "No directory selected."
+    fi
+}
