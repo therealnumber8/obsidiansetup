@@ -1,45 +1,46 @@
-# Global Apache configuration
-<Directory /var/www/html>
-    Options Indexes FollowSymLinks
-    AllowOverride None
-    Require all granted
-</Directory>
+<VirtualHost *:8080>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/html
 
-# API Directory Configuration
-<Directory /var/www/html/api>
-    RewriteEngine On
-    RewriteRule ^.+$ index.php [L,QSA]
-</Directory>
+    # Enable .htaccess files
+    <Directory /var/www/html>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
 
-# Public Directory Configuration
-<Directory /var/www/html/public>
-    RewriteEngine On
-    
-    # Rewrite note requests without '.html' to the actual .html file
-    RewriteCond %{REQUEST_FILENAME} .*/notes/.*
-    RewriteCond %{REQUEST_FILENAME}.html -f
-    RewriteRule !.*\.html$ %{REQUEST_FILENAME}.html [L]
-</Directory>
+        # Rewrite rules
+        RewriteEngine On
+        
+        # If the request is for an actual file or directory, serve it directly
+        RewriteCond %{REQUEST_FILENAME} -f [OR]
+        RewriteCond %{REQUEST_FILENAME} -d
+        RewriteRule ^ - [L]
 
-# Root Directory Configuration
-<Directory /var/www/html>
-    RewriteEngine On
+        # Route /api requests to api/index.php
+        RewriteRule ^api/ api/index.php [L]
 
-    # Rewrite API requests to api/index.php
-    RewriteRule ^api/(.*)$ api/index.php [L,QSA]
+        # Route all other requests to public/index.php
+        RewriteRule ^ public/index.php [L]
+    </Directory>
 
-    # Fallback for other requests to public directory
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(.*)$ public/$1 [L]
-</Directory>
+    # Set specific permissions for notes directory
+    <Directory /var/www/html/public/notes>
+        Options Indexes FollowSymLinks
+        AllowOverride None
+        Require all granted
+        
+        # Additional security for notes directory
+        <FilesMatch "\.(php|phar|phtml|php3|php4|php5|php7|phps)$">
+            Require all denied
+        </FilesMatch>
+    </Directory>
 
-# PHP configuration
-<IfModule mod_php.c>
-    php_value display_errors Off
-    php_value log_errors On
-    php_value error_log /tmp/php_errors.log
-    php_value upload_max_filesize 10M
-    php_value post_max_size 10M
-</IfModule>
+    # Deny access to sensitive files
+    <FilesMatch "^\.">
+        Require all denied
+    </FilesMatch>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
 
