@@ -1,0 +1,20 @@
+    {
+        "key": "f5",
+        "command": "toggle",
+        "when": "explorerViewletVisible",
+        "args": {
+            "id": "toggleDotFiles",
+            "value": [
+                {
+                    "files.exclude": {
+                        "**/.*": true
+                    }
+                },
+                {
+                    "files.exclude": {
+                        "**/.*": false
+                    }
+                }
+            ]
+        }
+    },  
