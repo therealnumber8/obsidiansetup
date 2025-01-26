@@ -1,0 +1,19 @@
+  parameters {
+    extendedChoice(
+      name: 'FOLDER_CHOICES',
+      description: 'Pick a top-level folder from main branch',
+      type: 'PT_SINGLE_SELECT', 
+      groovyScript: [
+        script: '''
+          def proc = 'git ls-tree --name-only -d HEAD'.execute(null, new File("${WORKSPACE}"))
+          proc.waitFor()
+          
+          if (proc.exitValue() == 0) {
+            return proc.in.text.readLines().join(',')
+          } else {
+            return "Error_Listing_Directories"
+          }
+        ''',
+        fallbackScript: 'return "Fallback_Value"' 
+      ]
+    )
