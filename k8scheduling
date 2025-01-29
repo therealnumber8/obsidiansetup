@@ -1,0 +1,24 @@
+# Taints on Nodes
+kubectl get nodes -o jsonpath="{range .items[?(@.spec.taints)]}{.metadata.name}{'\n'}{end}"
+
+# Tolerations on Pods
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.tolerations)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# Node Affinity
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.affinity.nodeAffinity)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# Node Anti-Affinity
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.affinity.nodeAntiAffinity)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# Pod Affinity
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.affinity.podAffinity)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# Pod Anti-Affinity
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.affinity.podAntiAffinity)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# Node Selector
+kubectl get pods -A -o jsonpath="{range .items[?(@.spec.nodeSelector)]}{.metadata.namespace}/{.metadata.name}{'\n'}{end}"
+
+# DaemonSets
+kubectl get daemonsets -A
+

@@ -1,0 +1,38 @@
+stage('Build & SonarQube Scan') {
+    agent any
+    environment {
+        SONAR_AUTH_TOKEN = credentials('sonar-auth-token-credential-id')
+    }
+    steps {
+        script {
+            def solutionFile = findFiles(glob: '**/*.sln')[0]
+            def solutionName = solutionFile.name.replaceFirst(/\.sln$/, '')
+            env.SONAR_PROJECT_KEY = solutionName
+            env.SONAR_PROJECT_NAME = solutionName.replaceAll(/([A-Z])/, ' $1').trim()
+        }
+
+        bat 'dotnet restore YourSolution.sln'
+        bat 'dotnet build YourSolution.sln --configuration Release'
+
+        withSonarQubeEnv('SonarQube-Server') {
+            bat """
+                dotnet sonarscanner begin \
+                /k:"${env.SONAR_PROJECT_KEY}" \
+                /n:"${env.SONAR_PROJECT_NAME}" \
+                /d:sonar.login="${env.SONAR_AUTH_TOKEN}" \
+                /d:sonar.cs.dotcover.reportsPaths=**/*.dotcover.xml
+            """
+            bat 'dotnet build YourSolution.sln'
+            bat 'dotnet sonarscanner end /d:sonar.login=${env.SONAR_AUTH_TOKEN}'
+        }
+    }
+    post {
+        success {
+            script {
+                timeout(time: 1, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
+                }
+            }
+        }
+    }
+}
