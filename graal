@@ -1,0 +1,8 @@
+When you compile a GraalVM native image without enabling JFR (for example by setting --enable-monitoring=jfr=false), GraalVM excludes or partially omits Flight Recorder libraries and native methods. If your code (like JDBI in these examples) still references jdk.jfr.* classes—even indirectly—those references trigger an UnsatisfiedLinkError at runtime, because GraalVM’s Substrate VM did not include the necessary native linkage for JFR.
+
+
+
+
+By default, GraalVM native image builds aim to include only what’s strictly needed - include where?. When monitor/jfr=false is specified, the build process excludes JFR’s underlying native methods from the compiled image, but you might still see jdk.jfr classes on the classpath (because your base JDK has them). This mismatch—“class is on the classpath but its native methods were never added to the image”—causes UnsatisfiedLinkError.
+
+“include” refers to what actually ends up inside the final, compiled executable (the native binary). During the build, GraalVM performs a reachability analysis, scanning your application code and libraries to determine which classes, methods, and native methods are actually needed. Only that “reachable” code is compiled and packaged into the generated binary—everything else is omitted. This is how GraalVM keeps executables as slim and self-contained as possible.
