@@ -1,0 +1,23 @@
+/* target external links in ALL views */
+body:is(.theme-dark, .theme-light) {
+    --link-external-color: c3c8df;
+    --link-external-color-hover: c3c8df;
+  }
+  
+  /* revert undesired edit-mode external link parenthesis coloring */
+  body:is(.theme-dark, .theme-light) .cm-s-obsidian span.cm-url.cm-formatting-link-string {
+    color: var(--text-faint);
+  }
+  
+  /* target both internal WIKI links & MD links in ALL views */
+  body:is(.theme-dark, .theme-light) :is(
+    .cm-s-obsidian span.cm-hmd-internal-link,
+    .cm-s-obsidian span.cm-url:has([data-link-path$="md"]),
+    .cm-s-obsidian span.cm-link:has([data-link-path$="md"]),
+    .cm-s-obsidian span.cm-link:has([data-link-path$="md"]) .cm-underline:hover,
+    .markdown-rendered .internal-link
+  ) {
+    color: c3c8df;
+  }
+
+  
