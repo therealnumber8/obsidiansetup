@@ -1,0 +1,38 @@
+To investigate ECONNRESET errors using tshark, you can use several commands. Here are some helpful approaches:
+
+1. To capture TCP RST packets and see where the connection resets are occurring:
+```bash
+tshark -i any -Y "tcp.flags.reset == 1" -T fields -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport
+```
+
+2. To see the full connection flow including the reset:
+```bash
+tshark -i any -Y "tcp.flags.reset == 1 or tcp.flags.syn == 1" -T fields -e frame.time -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e tcp.flags
+```
+
+3. To focus specifically on Socket.IO traffic and resets:
+```bash
+tshark -i any -Y "(tcp.port == 80 or tcp.port == 443 or tcp.port == YOUR_SOCKET_PORT) and (http.request or websocket or tcp.flags.reset == 1)"
+```
+
+Additional information about ECONNRESET:
+- It typically means the connection was forcibly closed by the remote peer
+- Common causes:
+  - Client timeout
+  - HAProxy timeout settings
+  - Network interruptions
+  - Firewall rules
+  - Load balancer issues
+
+To get more diagnostic information, you could also:
+1. Add detailed timestamps to your captures:
+```bash
+tshark -i any -Y "tcp.flags.reset == 1" -t ad
+```
+
+2. Save full packet captures around the time of errors:
+```bash
+tshark -i any -b duration:3600 -w capture-%H%M.pcap
+```
+
+This will help you correlate the network events with your application errors.
