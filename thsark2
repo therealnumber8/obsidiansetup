@@ -1,0 +1,23 @@
+Based on this NPM ECONNRESET error during package installation, here are the two most informative tshark one-liners:
+
+1. To capture the complete NPM registry connection attempts and failures:
+```bash
+tshark -i any -Y "(http.request or http.response or tcp.flags.reset == 1) and (tcp.port == 443 or tcp.port == 80)" -T fields -e frame.time -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e http.request.method -e http.request.uri -e http.response.code -e tcp.flags -e ssl.handshake.type
+```
+
+2. To see if there are proxy or SSL/TLS negotiation issues:
+```bash
+tshark -i any -Y "(host registry.npmjs.org or ssl.handshake.type) and (tcp.flags.reset == 1 or ssl.alert.desc or http.response.code >= 400)" -T fields -e frame.time -e ip.src -e ip.dst -e ssl.handshake.type -e ssl.alert.desc -e http.response.code -e tcp.window_size -e tcp.flags
+```
+
+These will show:
+- NPM registry connection attempts
+- SSL/TLS handshake failures
+- Proxy interaction issues
+- HTTP status codes
+- Connection resets timing
+- Which side initiated the reset
+- Any SSL alerts or errors
+- Connection window sizes that might indicate network issues
+
+The error suggests possible proxy or network connectivity issues, so these captures will help identify where exactly the connection is failing.

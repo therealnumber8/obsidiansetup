@@ -1,0 +1,35 @@
+Here are enhanced tshark commands to get more details about the HTTP errors and connection resets:
+
+1. To see HTTP response codes and details along with resets:
+```bash
+tshark -i any -Y "tcp.flags.reset == 1 or http.response.code" -T fields -e frame.time -e ip.src -e ip.dst -e tcp.srcport -e tcp.dstport -e http.response.code -e http.response.phrase -e http.request.method -e http.request.uri
+```
+
+2. To see the full HTTP request/response content around resets:
+```bash
+tshark -i any -Y "(tcp.flags.reset == 1 or http.request or http.response) && tcp.stream eq <stream_number>" -T fields -e frame.time -e http.request.method -e http.request.uri -e http.request.headers -e http.file_data -e http.response.code
+```
+
+3. For WebSocket specific issues:
+```bash
+tshark -i any -Y "websocket.payload or tcp.flags.reset == 1" -T fields -e frame.time -e ip.src -e ip.dst -e websocket.payload -e tcp.flags
+```
+
+4. To capture the packets before and after the reset (context):
+```bash
+tshark -i any -Y "tcp.stream eq <stream_number>" -T fields -e frame.time -e ip.src -e ip.dst -e tcp.flags -e tcp.analysis.flags -e tcp.len -e http.request.method -e http.response.code
+```
+
+Key fields explained:
+- `http.response.code`: HTTP status code (e.g., 404, 500)
+- `http.request.headers`: Full request headers
+- `http.file_data`: The actual content of requests/responses
+- `tcp.analysis.flags`: TCP analysis flags showing potential issues
+- `tcp.len`: Length of TCP payload
+- `websocket.payload`: Content of WebSocket messages
+
+You can also add these useful fields:
+- `-e tcp.analysis.retransmission`: Show retransmitted packets
+- `-e tcp.analysis.out_of_order`: Show out of order packets
+- `-e tcp.window_size`: Show window size changes
+- `-e tcp.analysis.ack_lost_segment`: Show lost segments
