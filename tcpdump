@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: tcpdump-pod
+spec:
+  containers:
+  - name: tcpdump
+    image: nicolaka/netshoot   # Contains tcpdump and other network tools
+    securityContext:
+      privileged: true         # Required for full network access
+      capabilities:
+        add:
+          - NET_ADMIN         # Required for network interface access
+          - NET_RAW           # Required for raw packet capture
+          - SYS_ADMIN        # Helpful for some advanced features
+    command: 
+      - sleep
+      - infinity
