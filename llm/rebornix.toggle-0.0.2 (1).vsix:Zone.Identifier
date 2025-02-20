@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=https://marketplace.visualstudio.com/items?itemName=rebornix.toggle
+HostUrl=https://marketplace.visualstudio.com/_apis/public/gallery/publishers/rebornix/vsextensions/toggle/0.0.2/vspackage
