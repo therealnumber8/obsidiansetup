@@ -1,0 +1,20 @@
+FROM nicolaka/netshoot:latest
+
+# Avoid prompts
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache nodejs npm sqlite-libs && \
+    node -v && \
+    npm -v && \
+    rm -rf /var/cache/apk/*
+
+WORKDIR /app
+
+# Create a sample project
+RUN mkdir -p /app/node-project && \
+    cd /app/node-project && \
+    npm init -y
+
+CMD ["/bin/bash"]
