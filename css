@@ -1,146 +1,475 @@
-<!DOCTYPE HTML>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>TEMPLATE_TITLE</title>
-    TEMPLATE_OG_TITLE
-    TEMPLATE_META_DESCRIPTION
-    <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <style>
-        html,
-        body {
-            overflow: visible !important;
-        }
+# If not running interactively, don't do anything
+case $- in
+    *i*) ;;
+      *) return;;
+esac
 
-        .view-content {
-            height: 100% !important;
-        }
+# History control
+HISTCONTROL=ignoreboth
+HISTSIZE=1000
+HISTFILESIZE=2000
+shopt -s histappend
+PROMPT_COMMAND='history -a'
 
-        .status-bar {
-            position: fixed !important;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            background: var(--background-secondary);
-        }
+# Check window size after each command
+shopt -s checkwinsize
 
-        .status-bar-item {
-            display: flex;
-            align-items: center;
-        }
+# === Environment Variables ===
+export SHELL=/bin/bash
+export EDITOR=nvim
+export TERM=xterm-256color
+export LANG=C.UTF-8
 
-        .status-bar-item-segment {
-            display: inline-flex;
-            align-items: center;
-            padding: 0 8px;
-            white-space: nowrap;
-        }
+# === Path Configuration ===
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib:/snap/bin:$PATH"
 
-        TEMPLATE_WIDTH
-    </style>
-    <link rel="stylesheet" href="TEMPLATE_CSS">
-    <script src="TEMPLATE_ASSETS_WEBROOT/app.js"></script>
-    TEMPLATE_SCRIPTS
-</head>
-<body TEMPLATE_BODY>
-<div class="app-container">
-    <div class="horizontal-main-container">
-        <div class="workspace">
-            <div class="workspace-split mod-vertical mod-root">
-                <div class="workspace-leaf mod-active">
-                    <div class="workspace-leaf-content">
-                        <div class="view-content">
-                            <div class="markdown-reading-view" style="height:100%;width:100%;">
-                                <div TEMPLATE_PREVIEW>
-                                    <div class="markdown-preview-sizer markdown-preview-section">
-                                        <div TEMPLATE_PUSHER></div>
-                                        TEMPLATE_NOTE_CONTENT
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="status-bar">
-        <div class="status-bar-item">
-            <span class="status-bar-item-segment"><a href="https://note.sx/" target="_blank">Share Note</a> for Obsidian</span>
-            <span id="theme-mode-toggle" class="status-bar-item-segment">🌓</span>
-        </div>
-    </div>
-</div>
-<div id="encrypted-data" style="display: none">TEMPLATE_ENCRYPTED_DATA</div>
-<script>
-  // Add/remove mobile classes depending on viewport size
-  function toggleMobileClasses () {
-    const mobileClasses = ['is-mobile', 'is-phone']
-    if (window.innerWidth <= 768) {
-      // Is mobile
-      document.body.classList.add(...mobileClasses)
-    } else {
-      document.body.classList.remove(...mobileClasses)
+# === Proxy Settings ===
+export http_proxy="http://seraphicproxy.harel-office.com:8082"
+export HTTP_PROXY="$http_proxy"
+export no_proxy="pamepkapiap02.harel-office.com,pamepkapiap01.harel-office.com,localhost,hrl-nexuspro.harel-office.com,google.com"
+
+# === WSL Specific Settings ===
+export WSL2_GUI_APPS_ENABLED=1
+export WAYLAND_DISPLAY=wayland-0
+export WSL_DISTRO_NAME=Ubuntu-24.04
+export WSL_PAC_URL="http://bcprvip/seraphic_prodproxy.pac"
+export DISPLAY=:0
+export PULSE_SERVER=unix:/mnt/wslg/PulseServer
+
+# === FZF Configuration ===
+export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border --inline-info --preview-window=:hidden --bind='ctrl-/:toggle-preview'"
+export FZF_CTRL_T_OPTS="--preview 'bat --style=numbers --color=always --line-range :500 {}' --preview-window right:60%"
+export FZF_ALT_C_OPTS="--preview 'tree -C {} | head -200' --preview-window right:60%"
+export FZF_CTRL_R_OPTS="--preview 'echo {}' --preview-window up:3:hidden:wrap --bind 'ctrl-/:toggle-preview' --bind 'ctrl-y:execute-silent(echo -n {2..} | clip.exe)+abort' --color header:italic --header 'Press CTRL-Y to copy command into clipboard, CTRL-/ to toggle preview'"
+
+# === Color Support ===
+# Enable color support for ls and grep
+if [ -x /usr/bin/dircolors ]; then
+    test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+fi
+
+# === Alias Definitions ===
+# Standard system aliases
+alias ls='ls --color=auto'
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -la'
+alias ~='cd ~'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
+alias g='grep'
+alias less='less -X -N'
+alias L='less -S'
+alias v='nvim'
+alias vim='nvim'
+alias mvn='~/.mvn/bin/mvn'
+alias s='source ~/.bashrc'
+
+# Git aliases
+alias gitrh='git reset HEAD --hard'
+alias grh='git reset HEAD --hard'
+alias gppp='git pull && git push'
+
+# Kubernetes aliases
+alias k='kubectl'
+alias kaf='k apply -f'
+alias kcat='kubectl get'
+alias kci='k cluster-info'
+alias kconnect='~/.k8/dmz_sixclusters'
+alias kctx='kubectx'
+alias kdhr='k delete --force helmrelease -n flux-system'
+alias kdp='k get deployments'
+alias kget='kubectl get'
+alias kghr='k get helmrelease -n flux-system --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac) | less -X -N'
+alias kgk='k get kustomization -n flux-system'
+alias kgpl='watch -d "kubectl get pods --sort-by=.metadata.creationTimestamp -o json | jq -r \".items | reverse | .[] | [.metadata.name, .status.phase, .status.startTime] | @tsv\" | column -t"'
+alias kgpr='k get pipelineruns -n tekton-pipelineruns --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac) | less -X -N'
+alias kgprl='watch -d -t "kubectl get pipelineruns -n tekton-pipelineruns --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac)"'
+alias kgpt='kubectl get pods --sort-by=.metadata.creationTimestamp --no-headers | tac'
+alias kgtr='k get taskruns -n tekton-pipelineruns --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac) | less -X -N'
+alias kgtrl='watch -d -t "kubectl get taskruns -n tekton-pipelineruns --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac)"'
+alias kinfo='k cluster-info'
+alias kneat='kubectl-neat'
+alias kns='kubens'
+alias kx='kubectx'
+
+# Docker aliases
+alias dckc='/home/tony/.k8/dckconnect'
+alias dckconnect='/home/tony/.k8/dckconnect'
+
+# Windows/WSL specific aliases
+alias "clip.exe"='/mnt/c/Windows/system32/clip.exe'
+alias code='/mnt/c/Users/antoni/AppData/Local/Programs/Microsoft\ VS\ Code/bin/code'
+alias codee='/mnt/c/Users/antoni/AppData/Local/Programs/Microsoft\ VS\ Code/code'
+alias dzi='find . -name "*Zone.Identifier" -type f -delete'
+
+# SSH aliases
+alias ssh12='ssh jenkinsp@10.40.5.58'
+alias ssh15='ssh jenkinsp@plmejnknap15'
+alias ssh7='ssh jenkinsp@plmesstmap07'
+
+# === Functions ===
+# FZF file widget
+fzf-file-widget() {
+    local selected="$(__fzf_select__ "$@")"
+    READLINE_LINE="${READLINE_LINE:0:$READLINE_POINT}$selected${READLINE_LINE:$READLINE_POINT}"
+    READLINE_POINT=$(( READLINE_POINT + ${#selected} ))
+}
+
+# Git branch selection with preview
+gbs() {
+    if ! command -v fzf > /dev/null 2>&1; then
+        echo "❌ fzf is not installed. Please install it first."
+        return 1
+    fi
+
+    if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+        echo "❌ Not a git repository"
+        return 1
+    fi
+
+    current_branch=$(git branch --show-current)
+    branches=$(git branch --all --format='%(refname:short)' | grep -v HEAD | sort -u)
+
+    if [ -z "$branches" ]; then
+        echo "❌ No branches found."
+        return 1
+    fi
+
+    formatted_branches=$(echo "$branches" | while read -r branch; do
+        if [ "$branch" = "$current_branch" ]; then
+            echo "* $branch (current)"
+        else
+            if [[ $branch == remotes/* ]]; then
+                echo "  $branch (remote)"
+            else
+                echo "  $branch"
+            fi
+        fi
+    done)
+
+    selected=$(echo "$formatted_branches" | fzf --height 40% --reverse --prompt="🔄 Select branch > " \
+        --preview 'git log --color=always -n 50 --pretty=format:"%C(yellow)%h%Creset %s %Cgreen(%cr) %C(blue)<%an>%Creset" $(echo {} | sed "s/.* \(.*\) (.*/\1/")' \
+        --preview-window right:60%)
+
+    if [ -n "$selected" ]; then
+        selected=$(echo "$selected" | sed 's/^[* ] //' | sed 's/ (.*)$//')
+        if [[ $selected == remotes/* ]]; then
+            branch_name=${selected##*/}
+            echo "🔄 Creating local branch '$branch_name' tracking '$selected'..."
+            if git checkout -b "$branch_name" --track "$selected" 2> /dev/null; then
+                echo "✅ Successfully switched to new branch '$branch_name'"
+            else
+                echo "❌ Failed to checkout branch"
+                return 1
+            fi
+        else
+            echo "🔄 Switching to '$selected'..."
+            if git checkout "$selected" 2> /dev/null; then
+                echo "✅ Successfully switched to '$selected'"
+            else
+                echo "❌ Failed to checkout branch"
+                return 1
+            fi
+        fi
+    fi
+}
+
+# Git commit and add
+gca() {
+    git add -A
+    git commit -m "$*"
+}
+
+# Git pull and push with upstream setting
+gpp() {
+    pull_output=$(git pull 2>&1)
+    if echo "$pull_output" | grep -q "no tracking information"; then
+        current_branch=$(git rev-parse --abbrev-ref HEAD)
+        echo "Setting upstream for branch: $current_branch"
+        git branch --set-upstream-to=origin/$current_branch $current_branch
+        git pull && git push
+        echo "git branch --set-upstream-to=origin/$current_branch $current_branch"
+    else
+        git push
+        echo "$pull_output"
+    fi
+}
+
+# Grep with full line context
+grepfull() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: grepfull <search_term>"
+        return 1
+    fi
+    grep -n -P "$1|$"
+}
+
+# Git squash interactive
+gsq() {
+    if ! command -v fzf > /dev/null 2>&1; then
+        echo "❌ fzf is not installed. Please install it first."
+        return 1
+    fi
+
+    if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+        echo "❌ Not a git repository"
+        return 1
+    fi
+
+    current_branch=$(git branch --show-current)
+    commits=$(git log --color=always --format="%C(yellow)%h%Creset %s %Cgreen(%cr) %C(blue)<%an>%Creset" HEAD)
+
+    if [ -z "$commits" ]; then
+        echo "❌ No commits found in the current branch."
+        return 1
+    fi
+
+    echo "🔍 Select the commit up to which you want to squash (all commits above will be included)"
+    selected=$(echo "$commits" | fzf --height 40% --reverse --ansi --prompt="Select commit > " \
+        --preview 'git show --color=always $(echo {} | cut -d" " -f1)' \
+        --preview-window right:60%)
+
+    if [ -z "$selected" ]; then
+        echo "❌ No commit selected."
+        return 1
+    fi
+
+    commit_hash=$(echo "$selected" | cut -d" " -f1)
+    commits_to_squash=$(git log --format="%an %h %s%n%b" "${commit_hash}^..HEAD" | while read -r line; do
+        if [[ $line =~ ^[[:space:]]*$ ]]; then
+            continue
+        fi
+        if [[ $line =~ ^[A-Za-z] ]]; then
+            author=$(echo "$line" | cut -d' ' -f1)
+            hash=$(echo "$line" | cut -d' ' -f2)
+            msg=$(echo "$line" | cut -d' ' -f3-)
+            changes=$(git show --format="" --name-status "$hash" | awk '{
+                if ($1 == "M") status="modified"
+                else if ($1 == "A") status="added"
+                else if ($1 == "D") status="removed"
+                else if ($1 == "R") status="renamed"
+                else status=$1
+                printf "%s %s, ", status, $2
+            }' | sed 's/, $//')
+            if [ ! -z "$changes" ]; then
+                changes=" ($changes)"
+            fi
+            echo "$author $hash $msg$changes"
+        fi
+    done)
+
+    commit_count=$(echo "$commits_to_squash" | wc -l)
+    echo -e "\n🔄 The following commits will be squashed:"
+    echo "----------------------------------------"
+    echo "$commits_to_squash"
+    echo "----------------------------------------"
+    echo -n "❓ Are you sure you want to continue? [y/N] "
+    read -n 1 REPLY
+    echo
+
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Operation cancelled."
+        return 1
+    fi
+
+    echo -e "\n📝 Enter the new commit message:"
+    read -r commit_message
+
+    if [ -z "$commit_message" ]; then
+        echo "❌ Commit message cannot be empty."
+        return 1
+    fi
+
+    echo -e "\n🔄 Performing squash..."
+    current_head=$(git rev-parse HEAD)
+    if git reset --soft "${commit_hash}^" && git commit -m "$commit_message"; then
+        echo "✅ Successfully squashed $commit_count commits!"
+    else
+        echo "❌ Failed to squash commits."
+        echo "🔄 Rolling back to previous state..."
+        git reset --hard "$current_head"
+        return 1
+    fi
+}
+
+# Kubernetes functions
+kdpr() {
+    kubectl delete pipelinerun -n tekton-pipelineruns "$1"
+    nohup flux reconcile kustomization gitops-pipelinerun > /dev/null 2>&1 < /dev/null & 
+    echo "requested reconciliation"
+}
+
+kdpr2() {
+    kubectl delete pipelinerun -n tekton-pipelineruns "$1"
+    nohup flux reconcile kustomization gitops-pipelinerun > /dev/null 2>&1 < /dev/null & 
+    echo "requested reconciliation"
+    
+    ( while true; do
+        PR_STATUS=$(k get pipelinerun "$1" -n tekton-pipelineruns 2> /dev/null)
+        if [ $? -eq 0 ]; then
+            echo -e "\nPipelinerun created: https://tekton-dashboard.apps.tap-dev-nat.harel-office.com/#/namespaces/tekton-pipelineruns/pipelineruns/$1?pipelineTask=buildpacks&step=create" > /dev/tty
+            break
+        fi
+        sleep 0.3
+    done ) &
+}
+
+# SOPS shell function
+sops-shell() {
+    local pods="$(kubectl -n devops-system get pods | grep '^sops-shell' | awk '{print $1}')"
+    if [ -z "$pods" ]; then
+        echo "No sops-shell pod found in devops-system namespace"
+        return 1
+    fi
+
+    local count=$(echo "$pods" | wc -l)
+    if [ "$count" -eq 1 ]; then
+        local pod_name="$pods"
+    else
+        local pod_name=$(echo "$pods" | fzf)
+    fi
+
+    [ -n "$pod_name" ] && kubectl -n devops-system exec -it "$pod_name" -- bash
+}
+
+# WSL helper functions
+wsl() {
+    /mnt/c/Windows/explorer.exe $(wslpath -w "$@")
+}
+
+wslcopy() {
+    /mnt/c/Windows/system32/clip.exe < "$1"
+}
+
+# Live push caution function
+livepushcaution() {
+    echo "🔄 Starting deployment process..."
+    gca s || { 
+        echo "❌ Git commit failed"
+        return 1
     }
-  }
-
-  window.addEventListener('resize', toggleMobileClasses)
-  toggleMobileClasses()
-
-  function base64ToArrayBuffer (base64) {
-    const binaryString = atob(base64)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
+    echo "✅ Changes committed"
+    
+    gpp || { 
+        echo "❌ Git push failed"
+        return 1
     }
-    return bytes.buffer
-  }
-
-  async function decryptString ({ ciphertext, iv }, secret) {
-    const ivArr = iv ? base64ToArrayBuffer(iv) : new Uint8Array(1)
-    const aesKey = await window.crypto.subtle.importKey('raw', base64ToArrayBuffer(secret), {
-      name: 'AES-GCM',
-      length: 256
-    }, false, ['decrypt'])
-
-    const plaintext = []
-    for (let index = 0; index < ciphertext.length; index++) {
-      const ciphertextChunk = ciphertext[index]
-      if (!iv) ivArr[0] = index & 0xFF
-      const ciphertextBuf = base64ToArrayBuffer(ciphertextChunk)
-      const plaintextChunk = await window.crypto.subtle
-        .decrypt({ name: 'AES-GCM', iv: ivArr }, aesKey, ciphertextBuf)
-      plaintext.push(new TextDecoder().decode(plaintextChunk))
+    echo "✅ Changes pushed"
+    
+    kdpr php-share-note-pipelinerun || { 
+        echo "❌ Pipeline deletion failed"
+        return 1
     }
-    return plaintext.join('')
-  }
+    echo "✅ Old pipeline runs deleted"
+    
+    watch -d -t "kubectl get pipelineruns -n tekton-pipelineruns --sort-by=.metadata.creationTimestamp | (head -n 1 && tail -n +2 | tac)"
+    echo "✅ Pipeline status displayed"
+    echo "🎉 Deployment process completed"
+}
 
-  /*
-   * Decrypt the original note content
-   */
-  const encryptedData = document.getElementById('encrypted-data').innerText.trim()
-  const payload = encryptedData ? JSON.parse(encryptedData) : ''
-  const secret = window.location.hash.slice(1) // Taken from the URL # parameter
-  if (payload && secret) {
-    decryptString({ ciphertext: payload.ciphertext, iv: payload.iv }, secret)
-      .then(text => {
-        // Inject the user's data
-        const data = JSON.parse(text)
-        const contentEl = document.getElementById('template-user-data')
-        if (contentEl) contentEl.outerHTML = data.content
-        document.title = data.basename
-        initDocument()
-      })
-      .catch(() => {
-        const contentEl = document.getElementById('template-user-data')
-        if (contentEl) contentEl.innerHTML = 'Unable to decrypt using this key.'
-      })
-  } else {
-    initDocument()
-  }
-</script>
-</body>
-</html>
+# Utility functions for quotes
+quote() {
+    local quoted=${1//\'/\'\\\'\'};
+    printf "'%s'" "$quoted"
+}
 
+quote_readline() {
+    local ret
+    _quote_readline_by_ref "$1" ret
+    printf %s "$ret"
+}
+
+# Command help function
+help() {
+    local cmd="$1"
+    local opt="$2"
+    opt="${opt#-}"
+    opt="${opt#-}"
+    
+    if man "$cmd" &> /dev/null; then
+        if [[ ${#opt} -eq 1 ]]; then
+            man "$cmd" | grep -A 2 "   -$opt[ ,]"
+        else
+            man "$cmd" | grep -A 2 "      --$opt"
+        fi
+    else
+        "$cmd" --help | grep -A 2 "[[:space:]]-*$opt"
+    fi
+}
+
+# Kubernetes helper functions
+kgp() {
+    kubectl get pods -o wide | awk '
+    NR==1 {
+        print
+        next
+    }
+    function parse_age(age) {
+        total=0
+        match(age, /([0-9]+)d/, d)
+        if (d[1] != "") total += d[1]*86400
+        match(age, /([0-9]+)h/, h)
+        if (h[1] != "") total += h[1]*3600
+        match(age, /([0-9]+)m/, m)
+        if (m[1] != "") total += m[1]*60
+        match(age, /([0-9]+)s/, s)
+        if (s[1] != "") total += s[1]
+        return total
+    }
+    {
+        secs[NR] = parse_age($5)
+        lines[NR] = $0
+    }
+    END {
+        n = asorti(secs, idx, "@val_num_asc")
+        for (i=1; i<=n; i++) print lines[idx[i]]
+    }' | cut -c -$COLUMNS
+}
+
+kgpb() {
+    kubectl get pods -o wide | awk '
+    function parse_age(age) {
+        total=0
+        match(age, /([0-9]+)d/, d); if(d[1]!="") total+=d[1]*86400
+        match(age, /([0-9]+)h/, h); if(h[1]!="") total+=h[1]*3600
+        match(age, /([0-9]+)m/, m); if(m[1]!="") total+=m[1]*60
+        match(age, /([0-9]+)s/, s); if(s[1]!="") total+=s[1]
+        return total
+    }
+    
+    NR==1 {
+        print $0 " ISSUES"
+        next
+    }
+    {
+        status=$3; ready=$2; age=$5
+        split(ready, readyArr, "/")
+        
+        if(status!="Running" || readyArr[1]!=readyArr[2]) {
+            i++
+            secs[i] = parse_age(age)
+            
+            issues=""
+            if(status!="Running") issues=issues"NotRunning "
+            if(readyArr[1]!=readyArr[2]) issues=issues"NotReady "
+            
+            lines[i] = $0 " [" issues "]"
+        }
+    }
+    END {
+        if(i>0) {
+            n=asorti(secs, idx, "@val_num_asc")
+            for(j=1; j<=n; j++) print lines[idx[j]]
+        }
+    }' | cut -c -$COLUMNS
+}
+
+# === Load additional configurations ===
+# Source any additional configurations from ~/.bashrc.d/
+if [ -d ~/.bashrc.d ]; then
+    for f in ~/.bashrc.d/*.sh; do
+        [ -f "$f" ] && . "$f"
+    done
+fi
