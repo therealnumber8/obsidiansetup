@@ -1,0 +1,314 @@
+### types of tcp timeouts (see [here](https://projectcontour.io/docs/v1.4.0/httpproxy/))
+- **Response Timeout** (timeoutPolicy.response):
+    - This timeout spans from when a complete client request has been processed by the proxy until the response from the server has been completely processed.
+    - Default value is 15 seconds in Envoy.
+    - It can be set to any positive time period or "infinity" (0s is treated as infinity).
+    - This timeout will occur if the upstream service takes too long to generate and send back a complete response.
+- **Idle Timeout** (timeoutPolicy.idle):
+    - This is the timeout for how long a connection can remain idle.
+    - There is no default per-route idle timeout.
+    - However, the default connection manager idle timeout of 5 minutes will apply if this isn't set.
+    - This timeout will occur when no data is transmitted over an established connection for the specified period.
+- **Per Try Timeout** (retryPolicy.perTryTimeout):
+    - This is used in the retry policy and specifies the timeout for each retry attempt.
+    - A retry will be attempted if the server returns a 5xx error code or if the server takes longer than this timeout to process a request.
+    - If this value is greater than the request timeout, it is ignored.
+    - If not specified, the timeoutPolicy.request value is used.
+
+
+
+
+### simulate first one
+```yaml
+---
+# Deployment with a container that simulates delayed responses
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: delay-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: delay-server
+  template:
+    metadata:
+      labels:
+        app: delay-server
+    spec:
+      containers:
+      - name: delay-server
+        image: python:3.9-slim
+        ports:
+        - containerPort: 8000
+        command:
+        - "/bin/bash"
+        - "-c"
+        - |
+          cat <<EOF > /app/server.py
+          from http.server import BaseHTTPRequestHandler, HTTPServer
+          import time
+          import os
+          
+          class DelayHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if self.path == '/health':
+                      self.send_response(200)
+                      self.send_header('Content-type', 'text/plain')
+                      self.end_headers()
+                      self.wfile.write(b'Health check OK')
+                      return
+                      
+                  # Parse delay from path if specified, e.g., /delay/5 for 5 seconds
+                  delay = 0
+                  if self.path.startswith('/delay/'):
+                      try:
+                          delay = int(self.path.split('/')[2])
+                      except (IndexError, ValueError):
+                          delay = 0
+                  
+                  # Default delay if not specified in path
+                  if self.path == '/':
+                      delay = 3
+                  
+                  self.send_response(200)
+                  self.send_header('Content-type', 'text/plain')
+                  self.end_headers()
+                  
+                  self.wfile.write(f"Request received, delaying response for {delay} seconds...\n".encode())
+                  self.wfile.flush()
+                  
+                  # Sleep to simulate delay
+                  time.sleep(delay)
+                  
+                  self.wfile.write(f"Response completed after {delay} seconds delay\n".encode())
+          
+          server = HTTPServer(('0.0.0.0', 8000), DelayHandler)
+          print('Starting server at http://0.0.0.0:8000')
+          server.serve_forever()
+          EOF
+          
+          mkdir -p /app
+          python /app/server.py
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "128Mi"
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+
+
+---
+# Deployment with a container that simulates delayed responses with socat
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: socat-delay-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: socat-delay-server
+  template:
+    metadata:
+      labels:
+        app: socat-delay-server
+    spec:
+      containers:
+      - name: socat-delay
+        image: alpine:latest
+        ports:
+        - containerPort: 8080
+        command:
+        - "/bin/sh"
+        - "-c"
+        - |
+          # Install socat
+          apk add --no-cache socat bash
+          
+          # Create response script
+          cat > /tmp/response.sh << 'EOF'
+          #!/bin/bash
+          
+          # Parse the request to get the path
+          read line
+          path=$(echo "$line" | awk '{print $2}')
+          
+          # Read and discard HTTP headers
+          while read header; do
+            header=$(echo "$header" | tr -d '\r\n')
+            [ -z "$header" ] && break
+          done
+          
+          # Default delay is 3 seconds
+          delay=3
+          
+          # Parse delay from path if specified: /delay/N
+          if [[ "$path" =~ ^/delay/([0-9]+) ]]; then
+            delay="${BASH_REMATCH[1]}"
+          fi
+          
+          # Respond with HTTP 200 header
+          echo -e "HTTP/1.1 200 OK\r"
+          echo -e "Content-Type: text/plain\r"
+          echo -e "Connection: close\r"
+          echo -e "\r"
+          
+          # Send initial part of response
+          echo "Request received, delaying response for ${delay} seconds..."
+          
+          # Simulate processing delay
+          sleep $delay
+          
+          # Send final part of response
+          echo "Response completed after ${delay} seconds delay"
+          EOF
+          
+          chmod +x /tmp/response.sh
+          
+          # Run socat to handle HTTP requests and execute our script for each connection
+          socat -v TCP-LISTEN:8080,fork,reuseaddr EXEC:/tmp/response.sh
+        resources:
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+          requests:
+            cpu: "50m"
+            memory: "32Mi"
+            
+---
+# Service to expose the delay server
+apiVersion: v1
+kind: Service
+metadata:
+  name: delay-server
+  namespace: default
+spec:
+  selector:
+    app: delay-server
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+  type: ClusterIP
+
+---
+# HTTPProxy with 2-second response timeout
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: timeout-test
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: timeout-test.example.com
+  routes:
+  - conditions:
+    - prefix: /
+    timeoutPolicy:
+      response: 2s
+    services:
+    - name: delay-server
+      port: 80
+
+---
+# HTTPProxy with 5-second response timeout
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: timeout-test-longer
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: timeout-longer.example.com
+  routes:
+  - conditions:
+    - prefix: /
+    timeoutPolicy:
+      response: 5s
+    services:
+    - name: delay-server
+      port: 80
+```
+
+
+### simulate idle timeout
+```bash
+---
+# Deployment for idle timeout testing with socat
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: idle-test
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: idle-test
+  template:
+    metadata:
+      labels:
+        app: idle-test
+    spec:
+      containers:
+      - name: socat
+        image: alpine:latest
+        command:
+        - "/bin/sh"
+        - "-c"
+        - |
+          apk add --no-cache socat
+          # Simple HTTP server that keeps connection open without data transfer
+          socat -v TCP-LISTEN:8080,fork,reuseaddr 'SYSTEM:"echo -e \"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: keep-alive\r\n\r\nConnection established. Keeping idle...\"; sleep 3600"'
+        ports:
+        - containerPort: 8080
+---
+# Service for idle test server
+apiVersion: v1
+kind: Service
+metadata:
+  name: idle-test
+  namespace: default
+spec:
+  selector:
+    app: idle-test
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+# HTTPProxy with 5s idle timeout
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: idle-test-short
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: idle-short.example.com
+  routes:
+  - services:
+    - name: idle-test
+      port: 80
+    timeoutPolicy:
+      idle: 5s
+---
+# HTTPProxy with 30s idle timeout
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: idle-test-long
+  namespace: default
+spec:
+  virtualhost:
+    fqdn: idle-long.example.com
+  routes:
+  - services:
+    - name: idle-test
+      port: 80
+    timeoutPolicy:
+      idle: 30s
+```
