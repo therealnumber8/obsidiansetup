@@ -1,0 +1,132 @@
+# Simplified JSON Configurator with Prefix-Based Selection
+
+I'll create a more streamlined solution that eliminates the need for explicitly listing keys. Instead, we'll use a prefix pattern to identify which environment variables should be included in the JSON file.
+
+## The Improved Script (env-to-json.sh)
+
+```bash
+#!/bin/bash
+set -e
+
+# Configuration
+JSON_FILE="${TARGET_JSON_FILE:-/app/myfileenv.json}"
+PREFIX="${JSON_PREFIX:-JSON_}"
+
+echo "JSON Configurator starting..."
+echo "Target JSON file: $JSON_FILE"
+echo "Looking for environment variables with prefix: $PREFIX"
+
+# Create directory if it doesn't exist
+mkdir -p $(dirname "$JSON_FILE")
+
+# Create empty JSON if file doesn't exist
+if [ ! -f "$JSON_FILE" ]; then
+    echo "{}" > "$JSON_FILE"
+    echo "Created new JSON file"
+else
+    echo "Updating existing JSON file"
+fi
+
+# Build jq filter
+FILTER="."
+UPDATE_COUNT=0
+
+# Process all environment variables that match our prefix
+for VAR_NAME in $(env | grep "^$PREFIX" | cut -d= -f1); do
+    # Get the actual value
+    VALUE="${!VAR_NAME}"
+    
+    # Remove prefix to get the JSON key name
+    KEY="${VAR_NAME#$PREFIX}"
+    
+    # Add to jq filter
+    FILTER="${FILTER} | .\"${KEY}\"=\"${VALUE}\""
+    UPDATE_COUNT=$((UPDATE_COUNT + 1))
+    echo "Updating key: $KEY = $VALUE"
+done
+
+# Apply the changes if there are any
+if [ $UPDATE_COUNT -gt 0 ]; then
+    echo "Updating JSON with $UPDATE_COUNT keys"
+    cat "$JSON_FILE" | jq "$FILTER" > "${JSON_FILE}.new"
+    mv "${JSON_FILE}.new" "$JSON_FILE"
+    echo "JSON file updated successfully"
+else
+    echo "No matching environment variables found, JSON file unchanged"
+fi
+
+# Show the final JSON
+echo "Final JSON content:"
+cat "$JSON_FILE"
+
+# Execute the provided command
+echo "Configuration complete, executing: $@"
+exec "$@"
+```
+
+## Using This in Your Kubernetes Pod
+
+Here's how your pod manifest would look with this simplified approach:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+spec:
+  initContainers:
+  - name: json-updater
+    image: your-registry/json-updater:latest
+    env:
+    # Where to find/save the JSON file
+    - name: TARGET_JSON_FILE
+      value: "/shared/myfileenv.json"
+    
+    # Your JSON keys and values - note the JSON_ prefix
+    - name: JSON_apiUrl
+      value: "https://api.example.com"
+    - name: JSON_maxRetries
+      value: "5"
+    - name: JSON_enableLogging
+      value: "true"
+    - name: JSON_timeout
+      value: "30"
+    
+    volumeMounts:
+    - name: shared-volume
+      mountPath: /shared
+  
+  containers:
+  - name: main-container
+    image: your-app-image:latest
+    volumeMounts:
+    - name: shared-volume
+      mountPath: /app  # Mount at your workdir
+  
+  volumes:
+  - name: shared-volume
+    emptyDir: {}
+```
+
+## How This Works
+
+1. All environment variables prefixed with `JSON_` will be included in the JSON file.
+2. The prefix (`JSON_`) is stripped when creating the JSON keys.
+3. All other environment variables are ignored.
+4. You can change the prefix by setting the `JSON_PREFIX` environment variable.
+
+For example, `JSON_apiUrl` becomes `{"apiUrl": "https://api.example.com"}` in the JSON file.
+
+This approach provides a clean, intuitive way to configure your JSON file directly from your Kubernetes manifest without needing to maintain a separate list of keys.
+
+## Benefits of This Approach
+
+1. **Clear convention**: Variables with the `JSON_` prefix go into the JSON file; everything else is ignored.
+
+2. **No extra configuration**: No need to maintain a separate list of keys.
+
+3. **Self-documenting**: The prefix makes it clear which environment variables are for JSON configuration.
+
+4. **Flexible**: You can change the prefix if needed, allowing for multiple configuration files.
+
+This pattern is widely used in containerized applications and makes your pod manifests both clean and intuitive.
