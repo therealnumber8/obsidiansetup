@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: host-debug-pod
+  namespace: default  # Adjust as needed
+spec:
+  hostNetwork: true
+  hostPID: true
+  hostIPC: true
+  containers:
+  - name: debug-container
+    image: ubuntu:22.04
+    command:
+      - sleep
+      - "3600"  # Keep pod running for 1 hour
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /host
+      name: host-root
+  volumes:
+  - name: host-root
+    hostPath:
+      path: /
+  nodeSelector:
+    kubernetes.io/hostname: <your-node-name>  # Specify the node you want to debug
+  tolerations:
+  - operator: "Exists"  # This will tolerate all taints, useful for control plane nodes
+---
+kubectl run debug-host --rm -it --privileged --overrides='{"spec": {"hostNetwork": true, "hostPID": true, "hostIPC": true, "containers": [{"name": "debug-container", "image": "ubuntu:22.04", "command": ["bash"], "securityContext": {"privileged": true}, "volumeMounts": [{"mountPath": "/host", "name": "host-root"}]}, {"name": "pause", "image": "kubernetes/pause"}], "volumes": [{"name": "host-root", "hostPath": {"path": "/"}}]}}' --image=ubuntu:22.04 -- bash
