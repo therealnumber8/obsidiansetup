@@ -1,0 +1,615 @@
+pipeline {
+    agent {
+        label 'docker-helm-twistlock'
+    }
+
+    parameters {
+        string(name: 'CHART_REPO_URL', defaultValue: '', description: 'Full repository URL (e.g., https://helm.datadoghq.com)')
+        string(name: 'CHART_NAME_VERSION', defaultValue: '', description: 'Chart name and version (e.g., datadog/datadog --version 3.110.6)')
+        string(name: 'HARBOR_REGISTRY', defaultValue: '', description: 'Private Harbor registry with project (e.g., harbor.example.com/library)')
+    }
+
+    environment {
+        // Hardcoded values
+        HARBOR_CREDENTIALS = 'harbor-credentials'
+        TWISTLOCK_CREDENTIALS = 'twistlock-credentials'
+        TWIST_CONSOLE_URL = 'https://twistlock-console.example.com:8083'
+        TWIST_CLI = 'twistcli'
+        WORKSPACE_DIR = "${WORKSPACE}"
+        CHART_DIR = "${WORKSPACE}/charts"
+        HELM_TEMP_DIR = "${WORKSPACE}/helm-temp"
+        VULNERABILITY_THRESHOLD = 'high'
+    }
+
+    stages {
+        stage('Validate Input') {
+            steps {
+                script {
+                    if (!params.CHART_REPO_URL || !params.CHART_NAME_VERSION || !params.HARBOR_REGISTRY) {
+                        error "All three parameters must be provided"
+                    }
+                    
+                    // Create necessary directories
+                    sh """
+                        mkdir -p ${CHART_DIR}
+                        mkdir -p ${HELM_TEMP_DIR}
+                        mkdir -p ${WORKSPACE}/scan_results
+                    """
+                    
+                    // Extract chart name and version from parameters
+                    def chartInfo = params.CHART_NAME_VERSION.split('--version')
+                    env.CHART_NAME = chartInfo[0].trim()
+                    env.CHART_VERSION = chartInfo.size() > 1 ? chartInfo[1].trim() : ""
+                    
+                    echo "Processing chart: ${env.CHART_NAME}, version: ${env.CHART_VERSION ?: 'latest'}"
+                    echo "Harbor registry: ${params.HARBOR_REGISTRY}"
+                }
+            }
+        }
+
+        stage('Add Chart Repository') {
+            steps {
+                script {
+                    // Add the helm repository
+                    sh "helm repo add chart-repo ${params.CHART_REPO_URL}"
+                    sh "helm repo update"
+                    
+                    // Get repository details for debugging
+                    sh "helm repo list"
+                }
+            }
+        }
+
+        stage('Download Chart') {
+            steps {
+                script {
+                    def fetchCommand = "helm fetch ${env.CHART_NAME}"
+                    if (env.CHART_VERSION) {
+                        fetchCommand += " --version ${env.CHART_VERSION}"
+                    }
+                    fetchCommand += " --destination ${CHART_DIR}"
+                    
+                    // Download the chart
+                    sh fetchCommand
+                    
+                    // Get the chart file name
+                    def chartFile = sh(script: "ls -1 ${CHART_DIR}/*.tgz | head -1", returnStdout: true).trim()
+                    env.CHART_FILE_PATH = chartFile
+                    env.CHART_FILE_NAME = chartFile.split('/')[-1]
+                    
+                    // Extract chart to temp directory for inspection
+                    sh "mkdir -p ${HELM_TEMP_DIR}/extracted"
+                    sh "tar -xzf ${env.CHART_FILE_PATH} -C ${HELM_TEMP_DIR}/extracted"
+                    
+                    // Find the extracted folder name
+                    def extractedFolder = sh(script: "ls -1 ${HELM_TEMP_DIR}/extracted/", returnStdout: true).trim()
+                    env.EXTRACTED_CHART_DIR = "${HELM_TEMP_DIR}/extracted/${extractedFolder}"
+                    
+                    echo "Downloaded chart to ${env.CHART_FILE_PATH}"
+                    echo "Extracted to ${env.EXTRACTED_CHART_DIR}"
+                }
+            }
+        }
+
+        stage('Extract Images from Chart') {
+            steps {
+                script {
+                    // Create a temporary values file to use for template rendering
+                    sh "cp ${env.EXTRACTED_CHART_DIR}/values.yaml ${WORKSPACE}/custom_values.yaml"
+                    
+                    // Render the chart templates to extract all images
+                    sh """
+                        helm template ${env.CHART_NAME} ${env.EXTRACTED_CHART_DIR} -f ${WORKSPACE}/custom_values.yaml > ${WORKSPACE}/rendered_templates.yaml
+                        grep -o 'image: [^\"]*' ${WORKSPACE}/rendered_templates.yaml | sed 's/image: //' | sort | uniq > ${WORKSPACE}/images.txt
+                        cat ${WORKSPACE}/images.txt
+                    """
+                    
+                    // Read the image list
+                    def imagesList = readFile("${WORKSPACE}/images.txt").trim()
+                    def images = imagesList ? imagesList.split('\n') : []
+                    
+                    env.IMAGES_COUNT = images.size().toString()
+                    echo "Found ${env.IMAGES_COUNT} unique images in the chart"
+                }
+            }
+        }
+
+        stage('Pull Images') {
+            when {
+                expression { return env.IMAGES_COUNT.toInteger() > 0 }
+            }
+            steps {
+                script {
+                    def images = readFile("${WORKSPACE}/images.txt").trim().split('\n')
+                    def pullResults = [:]
+                    
+                    // Pull images in parallel
+                    parallel images.collectEntries { image ->
+                        ["Pull ${image}" : {
+                            def pullStatus = sh(script: "docker pull ${image}", returnStatus: true)
+                            pullResults[image] = (pullStatus == 0)
+                            if (pullStatus != 0) {
+                                echo "Warning: Failed to pull image ${image}"
+                            } else {
+                                echo "Successfully pulled image ${image}"
+                            }
+                        }]
+                    }
+                    
+                    // Write pull results for later use
+                    writeJSON file: "${WORKSPACE}/pull_results.json", json: pullResults
+                    
+                    // Count successful pulls
+                    int successfulPulls = pullResults.count { k, v -> v }
+                    echo "${successfulPulls} of ${images.size()} images successfully pulled"
+                }
+            }
+        }
+
+        stage('Authenticate with Harbor') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: env.HARBOR_CREDENTIALS, usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
+                    sh "docker login ${params.HARBOR_REGISTRY.split('/')[0]} -u ${HARBOR_USER} -p ${HARBOR_PASSWORD}"
+                }
+            }
+        }
+
+        stage('Scan Images with Twistlock') {
+            when {
+                expression { return env.IMAGES_COUNT.toInteger() > 0 }
+            }
+            steps {
+                script {
+                    def images = readFile("${WORKSPACE}/images.txt").trim().split('\n')
+                    def pullResults = readJSON file: "${WORKSPACE}/pull_results.json"
+                    def scanResults = [:]
+                    
+                    // Create storage for scan results
+                    sh "mkdir -p ${WORKSPACE}/scan_results"
+                    
+                    // Process images in parallel
+                    parallel images.collectEntries { image ->
+                        ["Scan ${image}" : {
+                            if (pullResults[image]) {
+                                echo "Scanning image with Twistlock: ${image}"
+                                def safeImageName = image.replaceAll('[:/.@]', '_')
+                                def scanJsonPath = "${WORKSPACE}/scan_results/scan_${safeImageName}.json"
+                                
+                                scanResults[image] = [
+                                    'scanned': false,
+                                    'passed': false,
+                                    'critical': 0,
+                                    'high': 0,
+                                    'medium': 0,
+                                    'low': 0
+                                ]
+                                
+                                try {
+                                    // Run the Twistlock security scan
+                                    withCredentials([usernamePassword(credentialsId: env.TWISTLOCK_CREDENTIALS, usernameVariable: 'TWIST_USER', passwordVariable: 'TWIST_PASSWORD')]) {
+                                        def scanResult = sh(script: """
+                                            ${TWIST_CLI} images scan \\
+                                            --address ${TWIST_CONSOLE_URL} \\
+                                            --user ${TWIST_USER} \\
+                                            --password ${TWIST_PASSWORD} \\
+                                            --output-file ${scanJsonPath} \\
+                                            --details \\
+                                            --include-package-files \\
+                                            --json ${image}
+                                        """, returnStatus: true)
+                                        
+                                        // Mark as scanned
+                                        scanResults[image]['scanned'] = true
+                                        
+                                        // Process results
+                                        if (fileExists(scanJsonPath)) {
+                                            def critical = sh(script: "cat ${scanJsonPath} | grep -c '\"severity\":\"critical\"' || echo 0", returnStdout: true).trim()
+                                            def high = sh(script: "cat ${scanJsonPath} | grep -c '\"severity\":\"high\"' || echo 0", returnStdout: true).trim()
+                                            def medium = sh(script: "cat ${scanJsonPath} | grep -c '\"severity\":\"medium\"' || echo 0", returnStdout: true).trim()
+                                            def low = sh(script: "cat ${scanJsonPath} | grep -c '\"severity\":\"low\"' || echo 0", returnStdout: true).trim()
+                                            
+                                            scanResults[image]['critical'] = critical.toInteger()
+                                            scanResults[image]['high'] = high.toInteger()
+                                            scanResults[image]['medium'] = medium.toInteger()
+                                            scanResults[image]['low'] = low.toInteger()
+                                            
+                                            // Determine if passed based on threshold
+                                            def passed = true
+                                            if ((env.VULNERABILITY_THRESHOLD == 'critical' && critical.toInteger() > 0) ||
+                                                (env.VULNERABILITY_THRESHOLD == 'high' && (high.toInteger() > 0 || critical.toInteger() > 0)) ||
+                                                (env.VULNERABILITY_THRESHOLD == 'medium' && (medium.toInteger() > 0 || high.toInteger() > 0 || critical.toInteger() > 0)) ||
+                                                (env.VULNERABILITY_THRESHOLD == 'low' && (low.toInteger() > 0 || medium.toInteger() > 0 || high.toInteger() > 0 || critical.toInteger() > 0))) {
+                                                passed = false
+                                            }
+                                            
+                                            scanResults[image]['passed'] = passed
+                                            echo "Image ${image} scan complete. Passed: ${passed}"
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    echo "Error scanning image ${image}: ${e.message}"
+                                    scanResults[image]['error'] = e.message
+                                }
+                            } else {
+                                echo "Skipping scan for image ${image} as it could not be pulled"
+                            }
+                        }]
+                    }
+                    
+                    // Save scan results
+                    writeJSON file: "${WORKSPACE}/scan_results.json", json: scanResults
+                    
+                    // Generate scan report
+                    generateScanReport(images, scanResults)
+                }
+            }
+        }
+        
+        stage('Prepare Images for Harbor') {
+            when {
+                expression { return env.IMAGES_COUNT.toInteger() > 0 }
+            }
+            steps {
+                script {
+                    def images = readFile("${WORKSPACE}/images.txt").trim().split('\n')
+                    def pullResults = readJSON file: "${WORKSPACE}/pull_results.json"
+                    def tagResults = [:]
+                    def imageMapping = [:]
+                    
+                    // Tag images for Harbor and create mapping
+                    for (def image in images) {
+                        if (pullResults[image]) {
+                            try {
+                                // Parse image name to get repository and tag
+                                def parts = image.split(":")
+                                def repository = parts[0]
+                                def tag = parts.size() > 1 ? parts[1] : 'latest'
+                                
+                                // Get the last part of the repository for the new image name
+                                def repoName = repository.tokenize('/').last()
+                                
+                                // Create the new image name for Harbor
+                                def harborImage = "${params.HARBOR_REGISTRY}/${repoName}:${tag}"
+                                
+                                echo "Tagging ${image} as ${harborImage}"
+                                
+                                // Tag the image
+                                def tagStatus = sh(script: "docker tag ${image} ${harborImage}", returnStatus: true)
+                                
+                                tagResults[image] = (tagStatus == 0)
+                                if (tagStatus == 0) {
+                                    // Store mapping of original to new image for chart updates
+                                    imageMapping[image] = harborImage
+                                }
+                            } catch (Exception e) {
+                                echo "Error tagging image ${image}: ${e.message}"
+                                tagResults[image] = false
+                            }
+                        } else {
+                            tagResults[image] = false
+                        }
+                    }
+                    
+                    // Save results
+                    writeJSON file: "${WORKSPACE}/tag_results.json", json: tagResults
+                    writeJSON file: "${WORKSPACE}/image_mapping.json", json: imageMapping
+                }
+            }
+        }
+        
+        stage('Push Images to Harbor') {
+            when {
+                expression { return env.IMAGES_COUNT.toInteger() > 0 }
+            }
+            steps {
+                script {
+                    def imageMapping = readJSON file: "${WORKSPACE}/image_mapping.json"
+                    def pushResults = [:]
+                    
+                    // Push images to Harbor in parallel
+                    parallel imageMapping.collectEntries { originalImage, harborImage ->
+                        ["Push ${harborImage}" : {
+                            try {
+                                echo "Pushing ${harborImage} to Harbor"
+                                def pushStatus = sh(script: "docker push ${harborImage}", returnStatus: true)
+                                
+                                pushResults[originalImage] = (pushStatus == 0)
+                                if (pushStatus != 0) {
+                                    echo "Warning: Failed to push image ${harborImage}"
+                                } else {
+                                    echo "Successfully pushed image ${harborImage}"
+                                }
+                            } catch (Exception e) {
+                                echo "Error pushing image ${harborImage}: ${e.message}"
+                                pushResults[originalImage] = false
+                            }
+                        }]
+                    }
+                    
+                    // Save push results
+                    writeJSON file: "${WORKSPACE}/push_results.json", json: pushResults
+                    
+                    // Count successful pushes
+                    int pushedImages = pushResults.count { k, v -> v }
+                    echo "Successfully pushed ${pushedImages} images to Harbor"
+                }
+            }
+        }
+
+        stage('Update Chart Registry References') {
+            steps {
+                script {
+                    def imageMapping = readJSON file: "${WORKSPACE}/image_mapping.json"
+                    
+                    // Create a working copy of the chart
+                    sh "mkdir -p ${WORKSPACE}/chart-modified"
+                    sh "cp -R ${env.EXTRACTED_CHART_DIR}/* ${WORKSPACE}/chart-modified/"
+                    
+                    // Update values.yaml with new registry references
+                    def valuesFile = "${WORKSPACE}/chart-modified/values.yaml"
+                    def valuesContent = readFile(valuesFile)
+                    
+                    echo "Updating chart images to use Harbor registry"
+                    
+                    // For each image in our mapping, update references in values.yaml
+                    imageMapping.each { originalImage, harborImage ->
+                        def origRepo = originalImage.split(":")[0]
+                        def harborRepo = harborImage.split(":")[0]
+                        
+                        // Replace repository references
+                        valuesContent = valuesContent.replaceAll("repository: ${origRepo}", "repository: ${harborRepo}")
+                        
+                        // Also replace any direct image references
+                        valuesContent = valuesContent.replaceAll("image: ${originalImage}", "image: ${harborImage}")
+                    }
+                    
+                    // Handle registry prefixes in values.yaml
+                    def harborRegistry = params.HARBOR_REGISTRY.split('/')[0]
+                    valuesContent = valuesContent.replaceAll("registry: .*", "registry: ${harborRegistry}")
+                    
+                    // Write the updated values.yaml
+                    writeFile file: valuesFile, text: valuesContent
+                    
+                    // Update Chart.yaml with new repository info
+                    def chartYamlFile = "${WORKSPACE}/chart-modified/Chart.yaml"
+                    def chartYaml = readFile(chartYamlFile)
+                    
+                    // Add a note about the modification
+                    if (!chartYaml.contains("annotations:")) {
+                        chartYaml += "\nannotations:\n  registry.migrated: \"true\"\n"
+                    } else if (!chartYaml.contains("registry.migrated")) {
+                        chartYaml = chartYaml.replaceAll("annotations:", "annotations:\n  registry.migrated: \"true\"")
+                    }
+                    
+                    writeFile file: chartYamlFile, text: chartYaml
+                    
+                    // Display summary of changes
+                    echo "Chart updated to use Harbor registry: ${params.HARBOR_REGISTRY}"
+                    sh "cd ${WORKSPACE}/chart-modified && helm lint ."
+                }
+            }
+        }
+        
+        stage('Package and Push Chart to Harbor') {
+            steps {
+                script {
+                    // Get chart info from Chart.yaml
+                    def chartYaml = readFile("${WORKSPACE}/chart-modified/Chart.yaml")
+                    def chartName = sh(script: "grep '^name:' ${WORKSPACE}/chart-modified/Chart.yaml | awk '{print \$2}'", returnStdout: true).trim()
+                    def chartVersion = sh(script: "grep '^version:' ${WORKSPACE}/chart-modified/Chart.yaml | awk '{print \$2}'", returnStdout: true).trim()
+                    
+                    echo "Packaging chart: ${chartName} version ${chartVersion}"
+                    
+                    // Package the modified chart
+                    sh "cd ${WORKSPACE} && helm package ${WORKSPACE}/chart-modified"
+                    
+                    // Get the new package name
+                    def packagedChart = "${WORKSPACE}/${chartName}-${chartVersion}.tgz"
+                    
+                    // Login to Harbor OCI registry
+                    withCredentials([usernamePassword(credentialsId: env.HARBOR_CREDENTIALS, usernameVariable: 'HARBOR_USER', passwordVariable: 'HARBOR_PASSWORD')]) {
+                        sh "helm registry login ${params.HARBOR_REGISTRY.split('/')[0]} -u ${HARBOR_USER} -p ${HARBOR_PASSWORD}"
+                        
+                        // Push the chart to Harbor
+                        def harborRef = "${params.HARBOR_REGISTRY.split('/')[0]}/${params.HARBOR_REGISTRY.split('/')[1]}"
+                        sh "helm push ${packagedChart} oci://${harborRef}"
+                        
+                        echo "Successfully pushed chart to ${harborRef}/${chartName}:${chartVersion}"
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            script {
+                // Generate final report if data exists
+                try {
+                    if (fileExists("${WORKSPACE}/scan_results.json") && fileExists("${WORKSPACE}/push_results.json")) {
+                        def scanResults = readJSON file: "${WORKSPACE}/scan_results.json"
+                        def pushResults = readJSON file: "${WORKSPACE}/push_results.json"
+                        def imageMapping = readJSON file: "${WORKSPACE}/image_mapping.json"
+                        
+                        generateFinalReport(scanResults, pushResults, imageMapping)
+                    }
+                } catch (Exception e) {
+                    echo "Error generating final report: ${e.message}"
+                }
+                
+                // Clean up
+                sh "docker logout ${params.HARBOR_REGISTRY.split('/')[0]} || true"
+                sh "helm registry logout ${params.HARBOR_REGISTRY.split('/')[0]} || true"
+                
+                // Archive reports
+                archiveArtifacts artifacts: '*.html,*.json', allowEmptyArchive: true
+                
+                // Clean workspace
+                cleanWs()
+            }
+        }
+        success {
+            echo "Pipeline completed successfully! Chart has been migrated to Harbor registry."
+        }
+        failure {
+            echo "Pipeline failed. Please check the logs and reports for details."
+        }
+    }
+}
+
+// Helper function to generate scan report
+def generateScanReport(images, scanResults) {
+    sh """
+        echo '<html><head><title>Twistlock Scan Results</title>' > twistlock-report.html
+        echo '<style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #333; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+            th { background-color: #f2f2f2; }
+            .failed { background-color: #ffdddd; }
+            .passed { background-color: #ddffdd; }
+            .not-scanned { background-color: #ffffdd; }
+            .summary { margin: 20px 0; padding: 10px; border: 1px solid #ddd; background-color: #f9f9f9; }
+        </style>' >> twistlock-report.html
+        echo '</head><body>' >> twistlock-report.html
+        echo '<h1>Twistlock Security Scan Results</h1>' >> twistlock-report.html
+    """
+
+    // Add scan summary
+    int totalImages = images.size()
+    int scannedImages = scanResults.count { k, v -> v.scanned }
+    int passedImages = scanResults.count { k, v -> v.passed }
+    
+    sh """
+        echo '<div class="summary">' >> twistlock-report.html
+        echo '<h2>Summary</h2>' >> twistlock-report.html
+        echo '<p>Total images: ${totalImages}</p>' >> twistlock-report.html
+        echo '<p>Successfully scanned: ${scannedImages}</p>' >> twistlock-report.html
+        echo '<p>Passed vulnerability threshold: ${passedImages}</p>' >> twistlock-report.html
+        echo '<p>Failed vulnerability threshold: ${scannedImages - passedImages}</p>' >> twistlock-report.html
+        echo '<p>Not scanned (pull failures): ${totalImages - scannedImages}</p>' >> twistlock-report.html
+        echo '</div>' >> twistlock-report.html
+        
+        echo '<h2>Detailed Results</h2>' >> twistlock-report.html
+        echo '<table><tr>' >> twistlock-report.html
+        echo '<th>Image</th>' >> twistlock-report.html
+        echo '<th>Status</th>' >> twistlock-report.html
+        echo '<th>Critical</th>' >> twistlock-report.html
+        echo '<th>High</th>' >> twistlock-report.html
+        echo '<th>Medium</th>' >> twistlock-report.html
+        echo '<th>Low</th>' >> twistlock-report.html
+        echo '</tr>' >> twistlock-report.html
+    """
+    
+    // Add detailed rows for each image
+    scanResults.each { image, result ->
+        def rowClass = ""
+        def status = ""
+        
+        if (!result.scanned) {
+            rowClass = "not-scanned"
+            status = "Not Scanned"
+        } else if (result.passed) {
+            rowClass = "passed"
+            status = "Passed"
+        } else {
+            rowClass = "failed"
+            status = "Failed"
+        }
+        
+        sh """
+            echo '<tr class="${rowClass}">' >> twistlock-report.html
+            echo '<td>${image}</td>' >> twistlock-report.html
+            echo '<td>${status}</td>' >> twistlock-report.html
+            echo '<td>${result.critical ?: 0}</td>' >> twistlock-report.html
+            echo '<td>${result.high ?: 0}</td>' >> twistlock-report.html
+            echo '<td>${result.medium ?: 0}</td>' >> twistlock-report.html
+            echo '<td>${result.low ?: 0}</td>' >> twistlock-report.html
+            echo '</tr>' >> twistlock-report.html
+        """
+    }
+    
+    sh """
+        echo '</table>' >> twistlock-report.html
+        echo '</body></html>' >> twistlock-report.html
+    """
+    
+    // Archive the report
+    archiveArtifacts artifacts: 'twistlock-report.html', allowEmptyArchive: true
+}
+
+// Helper function to generate final report
+def generateFinalReport(scanResults, pushResults, imageMapping) {
+    sh """
+        echo '<html><head><title>Pipeline Results Summary</title>' > final-report.html
+        echo '<style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1, h2 { color: #333; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+            th, td { padding: 8px; text-align: left; border: 1px solid #ddd; }
+            th { background-color: #f2f2f2; }
+            .failed { background-color: #ffdddd; }
+            .passed { background-color: #ddffdd; }
+            .skipped { background-color: #ffffdd; }
+            .pushed { color: green; }
+            .not-pushed { color: red; }
+            .summary { margin: 20px 0; padding: 15px; border: 1px solid #ddd; background-color: #f9f9f9; }
+        </style>' >> final-report.html
+        echo '</head><body>' >> final-report.html
+        echo '<h1>Chart Migration Summary</h1>' >> final-report.html
+        echo '<div class="summary">' >> final-report.html
+        echo '<p><strong>Chart:</strong> ${env.CHART_NAME} ${env.CHART_VERSION ?: "latest"}</p>' >> final-report.html
+        echo '<p><strong>Source Repository:</strong> ${params.CHART_REPO_URL}</p>' >> final-report.html
+        echo '<p><strong>Destination Harbor:</strong> ${params.HARBOR_REGISTRY}</p>' >> final-report.html
+        echo '</div>' >> final-report.html
+        
+        echo '<h2>Image Processing Results</h2>' >> final-report.html
+        echo '<table>' >> final-report.html
+        echo '<tr>' >> final-report.html
+        echo '<th>Original Image</th>' >> final-report.html
+        echo '<th>Harbor Image</th>' >> final-report.html
+        echo '<th>Security Scan</th>' >> final-report.html
+        echo '<th>Vulnerabilities</th>' >> final-report.html
+        echo '<th>Pushed to Harbor</th>' >> final-report.html
+        echo '</tr>' >> final-report.html
+    """
+    
+    scanResults.each { image, result ->
+        def harborImage = imageMapping.containsKey(image) ? imageMapping[image] : "N/A"
+        def scanClass = ""
+        def scanStatus = ""
+        def vulnCount = ""
+        def pushStatus = pushResults.containsKey(image) ? (pushResults[image] ? "Yes" : "No") : "N/A"
+        def pushClass = pushResults.containsKey(image) ? (pushResults[image] ? "pushed" : "not-pushed") : ""
+        
+        if (!result.scanned) {
+            scanClass = "skipped"
+            scanStatus = "Not Scanned"
+            vulnCount = "N/A"
+        } else if (result.passed) {
+            scanClass = "passed"
+            scanStatus = "Passed"
+            vulnCount = "C:${result.critical ?: 0}, H:${result.high ?: 0}, M:${result.medium ?: 0}, L:${result.low ?: 0}"
+        } else {
+            scanClass = "failed"
+            scanStatus = "Failed"
+            vulnCount = "C:${result.critical ?: 0}, H:${result.high ?: 0}, M:${result.medium ?: 0}, L:${result.low ?: 0}"
+        }
+        
+        sh """
+            echo '<tr class="${scanClass}">' >> final-report.html
+            echo '<td>${image}</td>' >> final-report.html
+            echo '<td>${harborImage}</td>' >> final-report.html
+            echo '<td>${scanStatus}</td>' >> final-report.html
+            echo '<td>${vulnCount}</td>' >> final-report.html
+            echo '<td class="${pushClass}">${pushStatus}</td>' >> final-report.html
+            echo '</tr>' >> final-report.html
+        """
+    }
+    
+    sh """
+        echo '</table>' >> final-report.html
+        echo '</body></html>' >> final-report.html
+    """
+}
