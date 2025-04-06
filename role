@@ -1,4 +1,3 @@
-```bash
 # clusterrole
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -64,21 +63,49 @@ metadata:
 spec:
   serviceAccountName: control-plane-monitor-sa
   hostNetwork: true
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
   containers:
   - name: access-container
-    image: your-image
+    image: curlimages/curl:latest
+    command:
+    - sleep
+    - "86400"  # Sleep for a day to give you time to exec into the pod
     securityContext:
       privileged: true
+      # Mount etcd certificates for secure communication with etcd # These are required because etcd typically uses mutual TLS authentication - name: etcd-certs mountPath: /etc/kubernetes/pki/etcd readOnly: true
     volumeMounts:
     - name: etcd-certs
       mountPath: /etc/kubernetes/pki/etcd
+      readOnly: true
+    - name: kubernetes-certs
+      mountPath: /etc/kubernetes/pki
+      readOnly: true
+    - name: token
+      mountPath: /var/run/secrets/kubernetes.io/serviceaccount
       readOnly: true
   volumes:
   - name: etcd-certs
     hostPath:
       path: /etc/kubernetes/pki/etcd
       type: Directory
-
+  - name: kubernetes-certs
+    hostPath:
+      path: /etc/kubernetes/pki
+      type: Directory
+  - name: token
+    projected:
+      sources:
+      - serviceAccountToken:
+          path: token
+          expirationSeconds: 86400
 
 # curl command for etcd
 curl --cacert /etc/kubernetes/pki/etcd/ca.crt \
@@ -86,5 +113,10 @@ curl --cacert /etc/kubernetes/pki/etcd/ca.crt \
      --key /etc/kubernetes/pki/etcd/healthcheck-client.key \
      https://node-ip-or-localhost:2379/metrics
 
+# For kube-scheduler
+curl -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  https://localhost:10259/metrics
 
-```
+# For kube-controller-manager
+curl -k -H "Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  https://localhost:10257/metrics
