@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduler-metrics-viewer
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: scheduler-metrics-viewer
+rules:
+# For accessing the kube-scheduler pod metrics
+- apiGroups: [""]
+  resources: ["pods", "pods/proxy"]
+  verbs: ["get", "list"]
+# For accessing services
+- apiGroups: [""]
+  resources: ["services", "services/proxy", "endpoints"]
+  verbs: ["get", "list"]
+# For metrics endpoints (non-resource URLs)
+- nonResourceURLs: ["/metrics", "/metrics/*"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: scheduler-metrics-viewer
+subjects:
+- kind: ServiceAccount
+  name: scheduler-metrics-viewer
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: scheduler-metrics-viewer
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: metrics-viewer-pod
+  namespace: default
+spec:
+  serviceAccountName: scheduler-metrics-viewer
+  containers:
+  - name: metrics-viewer
+    image: curlimages/curl
+    command:
+    - sleep
+    - "86400"  # Sleep for 24 hours to give you plenty of time
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "200m"
