@@ -1,0 +1,90 @@
+```bash
+# clusterrole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: control-plane-monitoring-access
+rules:
+# For accessing component metrics and health endpoints
+- nonResourceURLs: 
+  - "/metrics"
+  - "/healthz"
+  - "/readyz"
+  - "/livez"
+  - "/debug/*"
+  verbs: ["get"]
+
+# For accessing Kubernetes API resources (needed for some component interactions)
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+# For scheduler-specific endpoints
+- apiGroups: ["scheduler.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+# For controller manager specific endpoints
+- apiGroups: ["controller.k8s.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+
+
+
+# crb
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: control-plane-monitoring-binding
+subjects:
+- kind: ServiceAccount
+  name: control-plane-monitor-sa
+  namespace: your-namespace
+roleRef:
+  kind: ClusterRole
+  name: control-plane-monitoring-access
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+# create the service account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: control-plane-monitor-sa
+  namespace: your-namespace
+
+# for etcd
+apiVersion: v1
+kind: Pod
+metadata:
+  name: control-plane-access-pod
+  namespace: your-namespace
+spec:
+  serviceAccountName: control-plane-monitor-sa
+  hostNetwork: true
+  containers:
+  - name: access-container
+    image: your-image
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - name: etcd-certs
+      mountPath: /etc/kubernetes/pki/etcd
+      readOnly: true
+  volumes:
+  - name: etcd-certs
+    hostPath:
+      path: /etc/kubernetes/pki/etcd
+      type: Directory
+
+
+# curl command for etcd
+curl --cacert /etc/kubernetes/pki/etcd/ca.crt \
+     --cert /etc/kubernetes/pki/etcd/healthcheck-client.crt \
+     --key /etc/kubernetes/pki/etcd/healthcheck-client.key \
+     https://node-ip-or-localhost:2379/metrics
+
+
+```
