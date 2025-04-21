@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-stress-test
+spec:
+  selector:
+    matchLabels:
+      app: node-stress-test
+  template:
+    metadata:
+      labels:
+        app: node-stress-test
+    spec:
+      containers:
+      - name: stress-tester
+        image: polinux/stress-ng
+        command:
+        - "/bin/stress-ng"
+        - "--cpu"
+        - "4"           # Number of CPU workers
+        - "--vm"
+        - "2"           # Number of memory workers
+        - "--vm-bytes"
+        - "1G"          # Memory per worker
+        - "--timeout"
+        - "300s"        # Duration
+        - "--metrics-brief"
+        resources:
+          requests:
+            cpu: "4"
+            memory: "2Gi"
+          limits:
+            cpu: "4"
+            memory: "2Gi"
+      # Optional: target specific nodes
+      # nodeSelector:
+      #   kubernetes.io/hostname: specific-node-name
