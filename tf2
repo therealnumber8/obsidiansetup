@@ -1,0 +1,265 @@
+# azure_vm_module
+
+terraform {
+  required_version = ">= 1.4"
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.105"
+    }
+  }
+}
+
+# The provider block can live only in root – keep here *only* when testing the module standalone.
+provider "azurerm" {
+  features {}
+}
+
+# ----------------------------
+#  VARIABLES
+# ----------------------------
+
+variable "vm_name"               { type = string }
+variable "resource_group_name"    { type = string }
+variable "location"               { type = string }
+
+variable "subnet_ids" {
+  type        = any  # string or list(string)
+  description = "Single subnet ID or list of subnet IDs. Index aligns 1‑for‑1 with NICs. If only one subnet is supplied but multiple NICs are attached, the same subnet is reused."
+}
+
+variable "vm_size" { type = string default = "Standard_B2s" }
+
+variable "os_type" {
+  type        = string
+  description = "linux or windows"
+  validation {
+    condition     = contains(["linux", "windows"], lower(var.os_type))
+    error_message = "os_type must be either \"linux\" or \"windows\"."
+  }
+}
+
+variable "admin_username" { type = string }
+
+variable "admin_password" {
+  type      = string
+  default   = null
+  sensitive = true
+}
+
+variable "ssh_public_key" {
+  type    = string
+  default = null
+}
+
+variable "disable_password_authentication" {
+  type        = bool
+  default     = true
+  description = "Disable password auth on Linux VMs (ignored by Windows)."
+}
+
+variable "use_existing_nics" {
+  type        = list(string)
+  default     = []
+  description = "Optional list of EXISTING NIC NAMES (same RG). If non‑empty, module expects you to *import* those NICs; otherwise it creates new ones."
+}
+
+variable "image" {
+  type = object({
+    publisher = string
+    offer     = string
+    sku       = string
+    version   = string
+  })
+  default = {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-focal"
+    sku       = "20_04-lts-gen2"
+    version   = "latest"
+  }
+}
+
+variable "data_disks" {
+  type = list(object({
+    name    = string
+    size_gb = number
+    sku     = optional(string, "Premium_LRS")
+  }))
+  default = []
+}
+
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+
+# ----------------------------
+#  LOCALS
+# ----------------------------
+
+locals {
+  is_linux   = lower(var.os_type) == "linux"
+  is_windows = !local.is_linux
+
+  # Always treat subnet_ids as a list
+  subnet_ids_list = flatten([var.subnet_ids])
+
+  # If user didn’t pass NIC names we will generate them; otherwise honour order.
+  nic_names = length(var.use_existing_nics) == 0 ?
+    [for idx in range(length(local.subnet_ids_list)) : "${var.vm_name}-nic-${idx}"] :
+    var.use_existing_nics
+
+  # If only 1 subnet supplied but many NICs -> replicate the subnet
+  aligned_subnets = length(local.subnet_ids_list) == 1 ?
+    [for _ in local.nic_names : local.subnet_ids_list[0]] :
+    local.subnet_ids_list
+}
+
+# ----------------------------
+#  NETWORK INTERFACES (managed OR imported)
+# ----------------------------
+
+resource "azurerm_network_interface" "nic" {
+  for_each = { for idx, nic_name in local.nic_names : tostring(idx) => nic_name }
+
+  name                = each.value
+  location            = var.location
+  resource_group_name = var.resource_group_name
+
+  ip_configuration {
+    name                          = "ipconfig"
+    subnet_id                     = local.aligned_subnets[tonumber(each.key)]
+    private_ip_address_allocation = "Dynamic"
+  }
+
+  tags = var.tags
+
+  # If you imported an existing NIC, you probably *don’t* want Terraform
+  # changing IP config or tags that differ. Ignore them.
+  lifecycle {
+    ignore_changes = [ ip_configuration, tags ]
+  }
+}
+
+# ----------------------------
+#  DATA DISKS
+# ----------------------------
+
+resource "azurerm_managed_disk" "data" {
+  for_each = { for d in var.data_disks : d.name => d }
+
+  name                 = each.value.name
+  location             = var.location
+  resource_group_name  = var.resource_group_name
+  storage_account_type = lookup(each.value, "sku", "Premium_LRS")
+  create_option        = "Empty"
+  disk_size_gb         = each.value.size_gb
+
+  tags = var.tags
+}
+
+# ----------------------------
+#  VIRTUAL MACHINE (Linux or Windows)
+# ----------------------------
+
+resource "azurerm_linux_virtual_machine" "this" {
+  count = local.is_linux ? 1 : 0
+
+  name                  = var.vm_name
+  location              = var.location
+  resource_group_name   = var.resource_group_name
+  size                  = var.vm_size
+  admin_username        = var.admin_username
+  disable_password_authentication = var.disable_password_authentication
+
+  network_interface_ids = [for idx in range(length(local.nic_names)) : azurerm_network_interface.nic[tostring(idx)].id]
+
+  source_image_reference {
+    publisher = var.image.publisher
+    offer     = var.image.offer
+    sku       = var.image.sku
+    version   = var.image.version
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  dynamic "admin_ssh_key" {
+    for_each = var.ssh_public_key != null ? [1] : []
+    content {
+      username   = var.admin_username
+      public_key = var.ssh_public_key
+    }
+  }
+
+  tags = var.tags
+}
+
+resource "azurerm_windows_virtual_machine" "this" {
+  count = local.is_windows ? 1 : 0
+
+  name                  = var.vm_name
+  location              = var.location
+  resource_group_name   = var.resource_group_name
+  size                  = var.vm_size
+  admin_username        = var.admin_username
+  admin_password        = var.admin_password
+
+  network_interface_ids = [for idx in range(length(local.nic_names)) : azurerm_network_interface.nic[tostring(idx)].id]
+
+  source_image_reference {
+    publisher = var.image.publisher
+    offer     = var.image.offer
+    sku       = var.image.sku
+    version   = var.image.version
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Premium_LRS"
+  }
+
+  tags = var.tags
+}
+
+# ----------------------------
+#  DATA‑DISK ATTACHMENTS
+# ----------------------------
+
+locals {
+  vm_id = local.is_linux ? azurerm_linux_virtual_machine.this[0].id : azurerm_windows_virtual_machine.this[0].id
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "data" {
+  for_each           = azurerm_managed_disk.data
+
+  managed_disk_id    = each.value.id
+  virtual_machine_id = local.vm_id
+  lun                = index(keys(azurerm_managed_disk.data), each.key)
+  caching            = "None"
+}
+
+# ----------------------------
+#  OUTPUTS
+# ----------------------------
+
+output "vm_id" {
+  value = local.vm_id
+}
+
+output "network_interface_ids" {
+  description = "Ordered NIC IDs (matches provided names or generated names)"
+  value       = [for idx in range(length(local.nic_names)) : azurerm_network_interface.nic[tostring(idx)].id]
+}
+
+output "private_ip_addresses" {
+  description = "Primary private IPs in the same order as network_interface_ids"
+  value       = [for idx in range(length(local.nic_names)) : azurerm_network_interface.nic[tostring(idx)].ip_configuration[0].private_ip_address]
+}
+
+output "data_disk_ids" {
+  value = [for d in azurerm_managed_disk.data : d.value.id]
+}
+
