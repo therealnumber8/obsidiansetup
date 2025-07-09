@@ -1,0 +1,119 @@
+You can keep the two workspaces on the same metastore yet store each environment’s data in its own ABFSS container by combining (1) a *managed catalog* that points at the new storage account and (2) a one-time **deep clone** of every table into that catalog.
+Nothing in the source workspace changes; the target gets a full, independent copy of both metadata *and* files.
+
+---
+
+## 1  Prepare the target storage account (once)
+
+| Task                                                                                                                | Why                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Create a new ADLS Gen2 container (for example `env-b`) in the target storage account.                               | Unity Catalog best practice is one account per environment to prevent accidental cross-access. ([Microsoft Learn][1]) |
+| Grant the Azure Databricks managed identity or service principal *Storage Blob Data Contributor* on that container. | Unity Catalog needs its own identity to read/write files. ([Microsoft Learn][2])                                      |
+
+---
+
+## 2  Register the storage path with Unity Catalog
+
+```sql
+-- 2.1 Create the storage credential (if you don’t have one already)
+CREATE STORAGE CREDENTIAL env_b_cred
+  WITH AZURE_MANAGED_IDENTITY
+  '--use-cluster-managed-identity--';
+
+-- 2.2 Expose the container as an external location
+CREATE EXTERNAL LOCATION env_b_root
+  URL 'abfss://env-b@trgstorage.dfs.core.windows.net/'
+  WITH (CREDENTIAL env_b_cred);
+```
+
+*An external location simply ties “who” (`env_b_cred`) to “where” (`abfss://…`).* ([Microsoft Learn][3])
+
+---
+
+## 3  Create an **isolated** catalog that writes into the new container
+
+```sql
+CREATE CATALOG env_b_catalog
+  MANAGED LOCATION 'abfss://env-b@trgstorage.dfs.core.windows.net/managed';
+```
+
+The `MANAGED LOCATION` directive tells Unity Catalog to store every managed table in that path, not in the original workspace’s storage. ([Microsoft Learn][4], [Microsoft Learn][5])
+
+Next, tie the catalog to only the target workspace:
+
+```bash
+databricks catalogs update env_b_catalog --isolation-mode ISOLATED
+databricks workspace-bindings update-bindings catalog env_b_catalog \
+  --json '{"add":[{"workspace_id":456,"binding_type":"BINDING_TYPE_READ_WRITE"}]}'
+```
+
+Isolation plus workspace binding means users in workspace A will never see this catalog, even though the metastore is shared. ([Databricks Documentation][6])
+
+---
+
+## 4  Deep-clone every table into the new catalog
+
+### 4.1 One-liner for a single table
+
+```sql
+CREATE TABLE env_b_catalog.sales.orders
+DEEP CLONE prod_catalog.sales.orders;
+```
+
+A **deep clone** copies the Delta files themselves, giving the target full history but zero dependency on the source container. ([Databricks Documentation][7], [Databricks Documentation][8])
+
+### 4.2 Notebook loop for an entire schema
+
+```python
+src_cat , src_schema = "prod_catalog" , "sales"
+trg_cat , trg_schema = "env_b_catalog" , "sales"
+
+tbls = [r.tableName for r in spark.sql(f"SHOW TABLES IN {src_cat}.{src_schema}").collect()]
+for t in tbls:
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {trg_cat}.{trg_schema}.{t}
+        DEEP CLONE {src_cat}.{src_schema}.{t}
+    """)
+```
+
+Community script templates that handle grants and views are available if you want full automation. ([Databricks Community][9])
+
+---
+
+## 5  Copy (or rewrite) privileges
+
+`SHOW GRANT ON TABLE prod_catalog.sales.orders;` returns every privilege; replay the output against the cloned table, or use a metaprogrammed loop in the same notebook.
+Because the catalog is isolated, you grant only the groups that live in workspace B.
+
+---
+
+## 6  Validate and switch workloads
+
+1. In workspace B, spin up a **Unity Catalog-enabled** cluster and run
+   `SELECT COUNT(*) FROM env_b_catalog.sales.orders;` – the query should succeed without touching the source container. ([Microsoft Learn][10])
+2. Pause compute in workspace A and verify nothing breaks; its tables still point at the original `env-a` container.
+3. (Optional) add an **incremental refresh** job that re-runs the deep-clone loop nightly; Delta will only copy new or changed files, keeping the two environments in sync at minimal cost. ([Microsoft Learn][11])
+
+---
+
+## Why this pattern works
+
+* **Physical separation** – every managed table in `env_b_catalog` lives under its own ABFSS path, satisfying strict data-segregation policies. ([Microsoft Learn][1])
+* **Single governance plane** – you still administer one metastore, so lineage, audits, and RBAC stay uniform. ([Microsoft Learn][12])
+* **Low-risk cloning** – deep clone is transactional and can recreate a table at a specific version if you ever need point-in-time recovery. ([Microsoft Learn][11])
+
+You hit the nail on the head with a 10 kg hammer: *one* metastore plus **managed-catalog + deep-clone** is the cleanest way to achieve completely separate storage while keeping governance simple.
+
+[1]: https://learn.microsoft.com/en-us/azure/databricks/dbfs/unity-catalog?utm_source=chatgpt.com "Best practices for DBFS and Unity Catalog - Azure Databricks"
+[2]: https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/azure-managed-identities?utm_source=chatgpt.com "Use Azure managed identities in Unity Catalog to access storage"
+[3]: https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/external-locations?utm_source=chatgpt.com "Create an external location to connect cloud storage to Azure ..."
+[4]: https://learn.microsoft.com/en-us/azure/databricks/connect/unity-catalog/cloud-storage/managed-storage?utm_source=chatgpt.com "Specify a managed storage location in Unity Catalog - Learn Microsoft"
+[5]: https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/?utm_source=chatgpt.com "What is Unity Catalog? - Azure Databricks | Microsoft Learn"
+[6]: https://docs.databricks.com/gcp/en/catalogs/binding?utm_source=chatgpt.com "Limit catalog access to specific workspaces"
+[7]: https://docs.databricks.com/aws/en/delta/clone?utm_source=chatgpt.com "Clone a table on Databricks"
+[8]: https://docs.databricks.com/aws/en/sql/language-manual/delta-clone?utm_source=chatgpt.com "CREATE TABLE CLONE - Databricks Documentation"
+[9]: https://community.databricks.com/t5/technical-blog/uc-catalog-cloning-an-automated-approach/ba-p/53460?utm_source=chatgpt.com "UC Catalog Cloning: An Automated Approach - Databricks Community"
+[10]: https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/get-started?utm_source=chatgpt.com "Get started with Unity Catalog - Azure Databricks | Microsoft Learn"
+[11]: https://learn.microsoft.com/en-us/azure/databricks/delta/clone?utm_source=chatgpt.com "Clone a table on Azure Databricks - Learn Microsoft"
+[12]: https://learn.microsoft.com/en-us/azure/databricks/data-governance/unity-catalog/best-practices?utm_source=chatgpt.com "Unity Catalog best practices - Azure Databricks | Microsoft Learn"
+
