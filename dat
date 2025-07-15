@@ -1,0 +1,112 @@
+Importing Existing Azure Data Factory Linked Services into a Terraform Module
+
+Scenario Overview
+
+You have a Terraform module that defines an Azure Data Factory Linked Service (specifically an azurerm_data_factory_linked_service_azure_databricks resource) using a for_each meta-argument. This module is being invoked (called) multiple times in your configuration to create several Databricks-linked service resources in a Data Factory. The code snippet provided (within the module) is looping over a map of linked service definitions (var.linked_services_databricks_job_compute_unity) to create instances of the linked service with various parameters (cluster config, custom tags, parameters, etc.).
+
+Now, you also have 7 existing Linked Service resources in the Data Factory that were created outside of Terraform (e.g. created manually or via another tool). You want to bring these under Terraform management – primarily to manage attributes like tags – without recreating them. The goal is to import these existing resources into the Terraform state and manage them using the same module configuration going forward.
+
+Using a Module to Manage Linked Services
+
+The module approach is appropriate here. Since your Terraform code is modularized, the existing 7 linked services should be managed by adding them to the module’s configuration and then importing them into the state. In practice, this means:
+
+Include those 7 linked services in your Terraform configuration (via the module). This could involve adding entries for them in the variable map that the module uses (var.linked_services_databricks_job_compute_unity), or creating new module calls if your design separates them. The key is that for each real-world linked service you want to manage, there must be a corresponding resource instance defined in Terraform.
+
+Ensure the Terraform resource names/keys match the existing resources. In your module code, the resource uses for_each with each.key as the name. So the map keys or identifiers you use for these 7 instances should exactly match the actual linked service names in Azure Data Factory. This way, the Terraform resource azurerm_data_factory_linked_service_azure_databricks.at_linked_job_compute_unity["<Name>"] corresponds to the real resource named <Name> in Azure.
+
+
+Once the config is prepared, Terraform will expect to manage those resources but will see they already exist in Azure. That’s where import comes in.
+
+Importing Existing Linked Services into the Module
+
+Yes – you need to import the existing Azure Data Factory Linked Service resources into the Terraform state, mapping them to the resource instances in your module. Terraform’s import functionality allows importing to any resource address, including those inside modules. In other words, you can import resources into module-managed addresses by specifying the full module path in the import command or import block.
+
+There are two ways to perform the import:
+
+1. Using the CLI terraform import commands (one per resource):
+For each of the 7 linked services, run the import command with the appropriate address. The syntax is:
+
+terraform import 'module.<module_name>.azurerm_data_factory_linked_service_azure_databricks.<resource_name>["<key>"]' <resource_id>
+
+Include the module.<module_name> prefix to target the module (replace <module_name> with the actual module instance name from your root configuration).
+
+Use the resource name as defined in the module (at_linked_job_compute_unity in your code) and the key in brackets that corresponds to the linked service name. For example, if your module block is named databricks_ls and one of the linked service names (key) is MyLinkedService, the address would be:
+module.databricks_ls.azurerm_data_factory_linked_service_azure_databricks.at_linked_job_compute_unity["MyLinkedService"].
+
+The <resource_id> is the full Azure resource ID of the linked service. According to the AzureRM provider docs, Data Factory Linked Services are imported using the resource ID, for example:
+/subscriptions/<sub-id>/resourceGroups/<rg-name>/providers/Microsoft.DataFactory/factories/<DF-name>/linkedservices/<LinkedServiceName>.
+
+
+Terraform’s documentation confirms that any valid resource address can be targeted, including those in modules. The process is: first add the resource in config, then run terraform import with the proper address and ID. For example, a Stack Overflow solution illustrates importing into a module by prefacing the address with module. and using the resource name and key:
+
+> “Then run terraform import <resource-name-in-module> <id>. So in your case, you would probably need to run something like:
+terraform import 'module.my_module.my_resource.my_resource_name' 'id'”.
+
+
+
+In your case, substitute my_module.my_resource.my_resource_name with the actual path to the linked service resource. If the resource uses for_each (string keys), include the key in square brackets. For example, importing a resource with key "MyLinkedService" would look like:
+
+terraform import module.databricks_ls.azurerm_data_factory_linked_service_azure_databricks.at_linked_job_compute_unity["MyLinkedService"] "/subscriptions/123.../linkedservices/MyLinkedService"
+
+(On some shells, you may need to escape quotes around the key.) This aligns with the general pattern shown in an example for importing resources created with for_each in a module.
+
+
+2. Using Terraform 1.5+ import blocks (in configuration):
+If you’re using Terraform v1.5 or later, you can leverage the new import block to declaratively import resources as part of the config (instead of running CLI commands in each environment). For instance, you could add an import block in your Terraform files referencing the module’s resource address and the resource ID. For example:
+
+import {
+  to = module.databricks_ls.azurerm_data_factory_linked_service_azure_databricks.at_linked_job_compute_unity["MyLinkedService"]
+  id = "/subscriptions/123.../resourceGroups/rg-name/providers/Microsoft.DataFactory/factories/DF-name/linkedservices/MyLinkedService"
+}
+
+You would create one such block for each of the 7 linked services (or use a single import block with its own for_each to import multiple at once). Terraform’s docs note that import blocks allow you to preview and automate imports in a plan/apply, similar to how the CLI works, and you can even use for_each inside an import block to import multiple instances in one go. Using this method in a CI/CD pipeline can be cleaner, as it doesn’t require manual CLI steps and is predictable in plan/apply workflows.
+
+
+
+Whichever method you choose, the outcome should be that Terraform knows those real Azure resources correspond to the module’s resource instances. The import process does not create or modify the actual resource; it only records it in the state file.
+
+Important: Before running an import, double-check that the Terraform configuration for those resources (the values in your module variables for those 7 instances) match the actual resource settings as closely as possible. Any differences will show up in the next plan – which is fine if you intend to change them (for example, adding missing tags), but you want to avoid accidentally forcing a replacement. Notably, keep the same name (must match exactly), the same Data Factory ID, and ideally the same cluster config parameters if you don’t want Terraform to change them on the next apply. If some settings differ and you do want to change them (like tags or descriptions), that’s okay – Terraform will propose an update rather than a new resource in most cases (changing the name or data_factory_id would force recreation, but changing tags or cluster size should be an in-place update).
+
+Continuing to Manage Imported Resources
+
+After you import the existing linked services, you can continue using the Terraform module to manage them going forward – this is exactly the point of importing. Once a resource is imported, Terraform treats it as if it had created it. According to HashiCorp’s documentation, *“Once imported, Terraform tracks the resource in your state file. You can then manage the imported resource like any other, updating its attributes and destroying it as part of a standard resource lifecycle.”*. In other words, yes, after importing you will use your Terraform module configurations in the usual way to make changes (such as updating tags, parameters, etc.) or even destroy the resource if needed, and Terraform will handle those changes on the real infrastructure.
+
+For example, an AWS-focused article demonstrated that after importing a resource into a module, running a normal terraform apply would then perform all the module-defined changes on that imported resource (like adding any tags or other properties that were defined in code but not present on the actual resource). In your case, this means once the Azure Databricks linked services are imported, any tags defined in the custom_tags map or other properties in the module config that differ from the current state of the resource will be applied. The imported linked services become fully managed by Terraform – any subsequent plan/apply will include them. A successful import essentially brings the resources under Terraform control, as noted in one guide: *“the resources we built via our module are now fully controlled by Terraform.”*.
+
+A few additional tips for a smooth transition:
+
+State verification: After importing, run terraform plan to see the delta between Terraform config and the actual imported resource settings. If Terraform wants to make unexpected changes, you might need to adjust the config. It’s normal to see some differences (for instance, if those linked services were created with no tags and your module supplies tags, Terraform will plan to add them – which is likely desired). Verify that any planned changes are intentional.
+
+Import blocks cleanup: If you used the import blocks method (as opposed to CLI), remember that Terraform will keep those in your configuration unless you remove them. Per Terraform docs, you can remove the import blocks after a successful import (they are not required for ongoing management) or leave them in as documentation – it’s up to you. Removing them won’t remove the resource; it just means Terraform won’t try to import again. If you used CLI, there’s no config to clean up, as the state is already updated.
+
+Module consistency: Continue to call the module with the same parameters moving forward. From this point on, treat those resources like any others in Terraform. You might update their variables (e.g., if you want to change the cluster size or environment variables), run plan, and apply – Terraform will handle the updates on the existing resource. There is no special handling needed for “previously imported” items after the import step. They live in state and are bound to your config.
+
+
+Summary of Answers to Points 1–4
+
+To explicitly address the numbered points in your question:
+
+1. Module source is the given configuration: Yes, you have a module whose source contains that azurerm_data_factory_linked_service_azure_databricks resource configuration (using for_each over the input map). This is the setup for managing linked services via Terraform.
+
+
+2. Multiple module calls creating resources: Yes, it’s fine (and common) to have multiple module calls. Each call could represent, for example, different sets of linked services or different Data Factories. The key is that all the desired linked service instances are represented in the Terraform config (whether via one aggregated module call with a map, or several module calls).
+
+
+3. Importing external linked services via module instances: Yes – you should import those 7 existing linked services into Terraform state under the corresponding module resource addresses. This likely means adding them to your module’s input and then using terraform import (or import blocks) with the module path, as discussed. Terraform supports importing into modules by specifying the full address.
+
+
+4. Managing with the module after import: You absolutely can continue (and are expected) to use the module to manage those resources after importing. After import, Terraform will treat them as managed objects. You can then change tags, update configurations, or even destroy them via Terraform. The module remains the interface through which you manage those linked services. In fact, after import, running a plan/apply will show any differences between the module config and the actual resource and then let Terraform bring the resource in line with your configuration (for example, adding the desired tags). This is the normal behavior – the imported resource is now under Terraform’s control, so the module can be used moving forward just like for resources it originally created. As the official docs put it, once imported you manage it like any other resource in Terraform’s state.
+
+
+
+By following these steps, you’ll end up with all 7 previously external Linked Services managed in Terraform, alongside any others the module creates. This allows you to uniformly manage tags and other properties through code. Just be cautious during the first apply after import to ensure only the intended changes are applied (review the plan). After that, your module will handle those imported resources as part of the infrastructure as code.
+
+Sources:
+
+HashiCorp Terraform Docs – Importing Existing Infrastructure: confirms importing resources into modules by address and post-import management.
+
+Stack Overflow – Importing a resource into a Terraform module: example of import address syntax with module path.
+
+Medium (Tyler DeKnecht) – Terraform Imports with Modules: demonstrated module import with for_each and subsequent apply managing the resource (adding tags, etc.).
+
+
