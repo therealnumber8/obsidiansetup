@@ -1,0 +1,57 @@
+# AWS Configuration
+aws_region = "us-west-2"
+
+# Project Configuration
+project_name = "my-efs-project"
+environment  = "dev"
+
+# EFS Configuration
+efs_encrypted        = true
+efs_performance_mode = "generalPurpose"
+efs_throughput_mode  = "bursting"
+
+# EFS Access Points
+efs_access_points = {
+  web = {
+    posix_user = {
+      gid = 1000
+      uid = 1000
+    }
+    root_directory = {
+      path = "/web"
+      creation_info = {
+        owner_gid   = 1000
+        owner_uid   = 1000
+        permissions = "755"
+      }
+    }
+  }
+  app = {
+    posix_user = {
+      gid = 1001
+      uid = 1001
+    }
+    root_directory = {
+      path = "/app"
+      creation_info = {
+        owner_gid   = 1001
+        owner_uid   = 1001
+        permissions = "755"
+      }
+    }
+  }
+  data = {
+    posix_user = {
+      gid = 1002
+      uid = 1002
+    }
+    root_directory = {
+      path = "/data"
+      creation_info = {
+        owner_gid   = 1002
+        owner_uid   = 1002
+        permissions = "755"
+      }
+    }
+  }
+}
