@@ -1,0 +1,464 @@
+# Databricks Asset Bundles CI/CD Implementation Guide
+
+**Databricks Asset Bundles (DAB) reached general availability in April 2024**, [Databricks](https://www.databricks.com/blog/announcing-general-availability-databricks-asset-bundles) fundamentally transforming how organizations deploy and manage Databricks assets across environments. This comprehensive guide provides step-by-step implementation for setting up CI/CD between dev and production Azure Databricks workspaces using Azure DevOps, incorporating the latest 2024/2025 features including workspace UI integration, Unity Catalog volumes support, and enhanced authentication patterns.
+
+The implementation leverages DAB's Infrastructure-as-Code approach to eliminate manual deployment processes, ensuring consistent, repeatable deployments with proper governance and security controls. [Databricks](https://docs.databricks.com/aws/en/dev-tools/bundles) [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/) This guide focuses on deploying notebooks and jobs exclusively, providing a streamlined path to production-ready CI/CD pipelines.
+
+## Prerequisites and initial setup requirements
+
+### Technical foundation requirements
+
+**Databricks CLI version 0.218.0 or higher** is essential for DAB functionality. [databricks](https://docs.databricks.com/aws/en/dev-tools/bundles) Recent updates include Unity Catalog volumes support (December 2024, CLI v0.236.0) and Databricks Apps deployment capabilities. [Databricks Documentation](https://docs.databricks.com/en/release-notes/dev-tools/bundles.html) The CLI installation will be automated within the Azure DevOps pipeline.
+
+**Azure Databricks workspaces** must have **workspace files enabled** - this is default for Databricks Runtime 11.3 LTS and above. [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/) Both dev and production workspaces require this feature for DAB deployments to function properly.
+
+**Azure DevOps project** needs proper permissions for service connection creation, pipeline creation, and variable group management. The implementing user must have Project Administrator or equivalent permissions.
+
+### Service principal setup requirements
+
+Create a dedicated service principal for CI/CD operations:
+
+```bash
+az ad sp create-for-rbac --name "databricks-cicd-sp" \
+  --role contributor \
+  --scopes /subscriptions/{subscription-id}/resourceGroups/{resource-group}
+```
+
+The service principal requires **Contributor role** on the Databricks workspace Azure resource and **Workspace Administrator role** within each Databricks workspace. [Stefanko](https://www.stefanko.ch/posts/effortless-databricks-asset-bundle-deployments-with-azure-devops/) This dual permission model ensures both Azure-level resource management and Databricks-specific deployment capabilities.
+
+Record the returned `appId`, `password`, and `tenant` values - these will be configured as Azure DevOps pipeline variables with appropriate secret marking.
+
+## Setting up the Databricks Asset Bundle project structure
+
+### Recommended directory organization
+
+Structure your repository following DAB conventions for optimal maintainability: [Medium](https://oindrila-chakraborty88.medium.com/introduction-to-databricks-asset-bundles-dabs-31ec4908caa8)
+
+```
+databricks-project/
+├── databricks.yml                 # Main bundle configuration
+├── resources/                     # Resource definitions
+│   ├── jobs.yml                  # Job definitions
+│   ├── pipelines.yml             # Pipeline definitions  
+│   └── environments.yml          # Environment-specific configs
+├── src/                          # Source code
+│   ├── notebooks/               # Databricks notebooks (.py or .ipynb)
+│   ├── python/                  # Python modules
+│   └── libraries/               # Custom libraries
+├── tests/                       # Test files
+│   ├── unit/                   # Unit tests
+│   └── integration/            # Integration tests
+├── azure-pipelines/            # DevOps pipeline definitions
+│   ├── azure-pipelines.yml    # Main pipeline
+│   ├── templates/              # Reusable templates
+│   └── variables/              # Variable definitions
+└── docs/                       # Documentation
+```
+
+### Critical file organization principles
+
+**Notebooks can be stored as .py files** with Databricks magic commands or traditional .ipynb format. The .py format integrates better with version control systems and code review processes.
+
+**Resource definitions** should be modularized in separate YAML files under the `resources/` directory. This separation enables better organization and easier maintenance of complex deployments.
+
+**Environment-specific configurations** are handled through the targets section in databricks.yml rather than separate files, promoting DRY principles while maintaining environment isolation.
+
+## Configuring authentication between Azure DevOps and Databricks workspaces
+
+### Service principal authentication setup
+
+**Azure Managed Identities represent the highest security standard** for production deployments, but service principal authentication provides more universal compatibility across different Azure DevOps hosting scenarios.
+
+Configure the following environment variables in Azure DevOps as **secret variables**:
+
+```yaml
+variables:
+  - name: DATABRICKS_HOST_DEV
+    value: https://adb-{dev-workspace-id}.{region}.azuredatabricks.net
+  - name: DATABRICKS_HOST_PROD  
+    value: https://adb-{prod-workspace-id}.{region}.azuredatabricks.net
+  - name: DATABRICKS_CLIENT_ID
+    value: {service-principal-client-id}
+  - name: DATABRICKS_CLIENT_SECRET
+    value: {service-principal-secret}  # Mark as secret
+  - name: ARM_TENANT_ID
+    value: {azure-tenant-id}
+```
+
+### Databricks workspace service principal registration
+
+Navigate to each Databricks workspace's **Admin Settings → Identity & Access → Service Principals** and add your service principal using the `appId` from the Azure CLI output. Grant **Workspace Administrator** privileges to enable deployment operations.
+
+The service principal must be explicitly added to both workspaces before pipeline execution. Missing this step results in authentication failures during deployment.
+
+## Creating the bundle configuration files (databricks.yml)
+
+### Core bundle configuration
+
+The `databricks.yml` file serves as the central configuration for your DAB project: [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/settings)
+
+```yaml
+bundle:
+  name: ${var.bundle_name}
+  
+variables:
+  bundle_name:
+    description: "Bundle name"
+    default: "my-databricks-project"
+  environment:
+    description: "Environment name" 
+    default: "dev"
+  
+include:
+  - resources/*.yml
+
+artifacts:
+  my_wheel:
+    type: whl
+    path: ./src/libraries/my_package
+
+workspace:
+  host: ${var.databricks_host}
+  root_path: /Workspace/bundles/${bundle.name}/${bundle.target}
+
+run_as:
+  service_principal_name: ${var.service_principal_id}
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      databricks_host: https://adb-{workspace-id}.{region}.azuredatabricks.net
+      service_principal_id: ${DATABRICKS_CLIENT_ID}
+    workspace:
+      host: ${var.databricks_host}
+    
+  prod:
+    mode: production
+    variables:
+      databricks_host: https://adb-{prod-workspace-id}.{region}.azuredatabricks.net  
+      service_principal_id: ${DATABRICKS_CLIENT_ID}
+    workspace:
+      host: ${var.databricks_host}
+    git:
+      branch: main
+```
+
+### Job configuration implementation
+
+Create `resources/jobs.yml` with your job definitions: [Databricks](https://docs.databricks.com/aws/en/dev-tools/bundles/resources) [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/resources)
+
+```yaml
+resources:
+  jobs:
+    data_pipeline_job:
+      name: ${var.environment}_data_pipeline
+      description: "Main data processing pipeline"
+      
+      tasks:
+        - task_key: bronze_ingestion
+          notebook_task:
+            notebook_path: ../src/notebooks/bronze_ingestion.py
+          new_cluster:
+            spark_version: 13.3.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 2
+            runtime_engine: STANDARD
+            
+        - task_key: silver_transformation
+          depends_on:
+            - task_key: bronze_ingestion
+          notebook_task:
+            notebook_path: ../src/notebooks/silver_transformation.py
+          new_cluster:
+            spark_version: 13.3.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 2
+            
+      schedule:
+        quartz_cron_expression: "0 0 2 * * ?"
+        timezone_id: "UTC"
+        
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+        on_success:
+          - ${var.alert_email}
+          
+      max_concurrent_runs: 1
+```
+
+The **relative path notation** `../src/notebooks/` is crucial for proper file resolution during deployment. DAB resolves paths relative to the resource file location.
+
+## Setting up the Azure DevOps pipeline YAML configuration
+
+### Complete multi-stage pipeline implementation
+
+Create `azure-pipelines.yml` in your repository root: [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/ci-cd/azure-devops)
+
+```yaml
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    exclude:
+      - README.md
+      - docs/*
+
+variables:
+- group: databricks-credentials  # Variable group with secrets
+
+stages:
+- stage: Validate
+  displayName: 'Validate Bundle'
+  jobs:
+  - job: ValidateBundle
+    displayName: 'Validate DAB Configuration'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: UsePythonVersion@0
+      inputs:
+        versionSpec: '3.10'
+        
+    - script: |
+        curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+      displayName: 'Install Databricks CLI'
+      
+    - script: |
+        databricks bundle validate -t dev
+      displayName: 'Validate Bundle'
+      env:
+        DATABRICKS_HOST: $(DATABRICKS_HOST_DEV)
+        DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+        DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToDev
+    displayName: 'Deploy to Dev Workspace'
+    environment: 'dev'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            
+          - script: |
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: 'Install Databricks CLI'
+            
+          - script: |
+              databricks bundle deploy -t dev --debug
+            displayName: 'Deploy Bundle to Dev'
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST_DEV)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+              
+          - script: |
+              # Optional: Run integration tests
+              databricks bundle run -t dev integration_tests_job
+            displayName: 'Run Integration Tests'
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST_DEV)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: DeployDev
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployToProd
+    displayName: 'Deploy to Production Workspace'
+    environment: 'production'
+    pool:
+      vmImage: 'ubuntu-latest'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+            
+          - script: |
+              curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+            displayName: 'Install Databricks CLI'
+            
+          - script: |
+              databricks bundle deploy -t prod --debug
+            displayName: 'Deploy Bundle to Production'
+            env:
+              DATABRICKS_HOST: $(DATABRICKS_HOST_PROD)
+              DATABRICKS_CLIENT_ID: $(DATABRICKS_CLIENT_ID)
+              DATABRICKS_CLIENT_SECRET: $(DATABRICKS_CLIENT_SECRET)
+```
+
+### Critical pipeline design principles
+
+**The `--debug` flag** provides essential troubleshooting information during deployment failures. Include this in initial implementations and remove only after establishing stable deployments.
+
+**Branch-based deployment control** using `eq(variables['Build.SourceBranch'], 'refs/heads/main')` ensures production deployments only trigger from the main branch, preventing accidental production updates.
+
+**Environment-based deployments** in Azure DevOps provide built-in approval gates and deployment history tracking, essential for audit requirements.
+
+## Best practices for environment-specific configurations
+
+### Variable inheritance and environment isolation
+
+**Define variables at the top level** before referencing them in targets. [Databricks](https://community.databricks.com/t5/machine-learning/using-variables-with-databricks-asset-bundles-not-working/td-p/88458) This pattern ensures consistent variable resolution across environments:
+
+```yaml
+variables:
+  cluster_size:
+    description: "Default cluster size"
+    default: 2
+  alert_email:
+    description: "Alert notification email"
+    default: "team@company.com"
+
+targets:
+  dev:
+    variables:
+      cluster_size: 1  # Override for cost optimization
+      alert_email: "dev-team@company.com"
+  
+  prod:
+    variables:
+      cluster_size: 4  # Scale for production workloads
+      alert_email: "prod-alerts@company.com"
+```
+
+### Mode-specific behavior optimization
+
+**Development mode** enables faster iteration with relaxed validation, while **production mode** enforces stricter governance rules. [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/deployment-modes) Configure modes appropriately:
+
+```yaml
+targets:
+  dev:
+    mode: development  # Allows overwriting existing resources
+    default: true     # Makes this the default target
+    
+  prod:
+    mode: production  # Enforces stricter validation
+    git:
+      branch: main   # Restricts to main branch deployments
+```
+
+Development mode permits resource overwriting and has relaxed validation rules, while production mode requires explicit confirmation for destructive operations and enforces stricter resource governance. [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/deployment-modes)
+
+## How to handle secrets and credentials securely
+
+### Azure Key Vault integration
+
+**Avoid hardcoding any sensitive information** in repository files. Implement Azure Key Vault-backed secret scopes: [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/resources)
+
+```yaml
+resources:
+  secret_scopes:
+    azure_key_vault_scope:
+      name: "akv-secrets"
+      backend_type: "AZURE_KEYVAULT"
+      keyvault_metadata:
+        resource_id: "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.KeyVault/vaults/{vault-name}"
+        dns_name: "{vault-name}.vault.azure.net"
+```
+
+### Pipeline security best practices
+
+**Use Azure DevOps Variable Groups** with secret marking for sensitive values. Configure variable groups at the organization or project level to enable sharing across multiple pipelines while maintaining security boundaries.
+
+**Implement least-privilege access** by granting service principals only the minimum permissions required for deployment operations. Regular credential rotation should be automated where possible.
+
+**Secret scanning** should be enabled on your repository to detect accidentally committed credentials. Configure branch protection rules to prevent direct pushes to main branches.
+
+## Testing and validation steps
+
+### Pre-deployment validation
+
+**Bundle validation should run on every commit** to catch configuration errors early: [Medium](https://oindrila-chakraborty88.medium.com/introduction-to-databricks-asset-bundles-dabs-31ec4908caa8)
+
+```bash
+databricks bundle validate -t dev
+```
+
+This command validates syntax, resource references, and basic configuration consistency without deploying to the workspace. [Databricks](https://docs.databricks.com/aws/en/dev-tools/bundles/resources) [Microsoft Learn](https://learn.microsoft.com/en-us/azure/databricks/dev-tools/bundles/work-tasks)
+
+### Integration testing strategy
+
+**Post-deployment testing** verifies successful deployment and basic functionality:
+
+```yaml
+- script: |
+    # Run a simple test job to verify deployment
+    JOB_ID=$(databricks bundle run -t dev data_pipeline_job --wait)
+    echo "Integration test job completed with ID: $JOB_ID"
+  displayName: 'Run Integration Tests'
+```
+
+**Test job patterns** should include basic connectivity tests, permission validation, and core functionality verification. Design these tests to run quickly while providing confidence in deployment success.
+
+### Validation checkpoints
+
+Implement validation at multiple stages: **syntax validation** during CI, **deployment validation** during CD, and **functional validation** post-deployment. Each stage provides increasingly comprehensive verification.
+
+## Deployment workflow from dev to prod
+
+### Standard promotion workflow
+
+**Feature development begins** with developers creating feature branches from the main branch. Development work proceeds with local testing using `databricks bundle deploy -t dev` for rapid iteration.
+
+**Pull request creation** triggers the validation pipeline, ensuring code quality and configuration correctness before merge approval. Implement branch protection rules requiring successful validation before merge.
+
+**Development deployment** occurs automatically upon merge to the develop branch (if using GitFlow) or immediately for direct main branch development. This provides a staging environment for integration testing.
+
+**Production approval gates** prevent unauthorized production deployments. Configure Azure DevOps environments with required approvers and optional delay timers.
+
+**Production deployment** executes only from the main branch with successful dev deployment as a prerequisite. This ensures all changes flow through the development environment first.
+
+### Approval process configuration
+
+Configure production environment protection rules:
+
+```yaml
+environments:
+  production:
+    approvals:
+      - type: required
+        users: ['prod-approvers@company.com']
+        instructions: 'Review deployment changes and approve for production release'
+    deployment_protection_rules:
+      - type: branch_policy
+        branches: ['main']
+```
+
+## Troubleshooting common issues
+
+### Authentication failures
+
+**Error: `failed during request visitor: default auth: azure-cli: cannot get account info`** [Databricks Community](https://community.databricks.com/t5/data-engineering/error-while-deploying-asset-bundle-using-azure-devops/td-p/87144)
+
+This indicates authentication configuration problems. Verify service principal permissions on both Azure resource and Databricks workspace levels. Ensure environment variables are properly set and marked as secrets.
+
+**Solution**: Add explicit authentication configuration:
+
+```yaml
+workspace:
+  host: ${var.databricks_host}
+  auth_type: azure-cli
+  azure_workspace_resource_id: "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Databricks/workspaces/{workspace}"
+```
+
+### Bundle validation errors
+
+**Error: `Variable not defined or cannot resolve variable`** [Stack Overflow](https://stackoverflow.com/questions/77542813/how-can-i-pass-parameters-to-databricks-yml-in-databricks-asset-bundles)
+
+Variable resolution failures often result from incorrect variable scope or syntax erro
