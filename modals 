@@ -1,0 +1,161 @@
+---
+quickshare-date: 2024-07-29 08:58:25
+quickshare-url: https://noteshare.space/note/clz6kvw7m1922701mw8lvszmhj#O/bhnpwCAdfLJ/b9YouyY05rgaSL58l8EKpi+OHemF0
+created: 2024-01-14T14:56
+updated: 2025-09-02T16:27
+---
+### Gold
+- Give questions to ask about X for my studnets and then the answers in parentheiss
+- How accurate is the above info I found online in terms of percentages? You absolutely must include a truthfulness percentage calculation estimate in your answer. I will not accept any answer that does not include your percentage estimation of truthfulness as the first word. It is absolutely mandatory!  Please return the whole original piece of information back to me but bolden parts of text that in your estimation do not make it 100% accurate only only those. dont put the entire thing in bold. explain why shortly for each part. Ignore any spelling mistakes as factors when calculating the truthfulness percentage.
+- What is this category of things called?
+- map out the mental relationship between these concepts within the semantic field using logic. organize them hierarchically and logically. Craft a structured mapping that elucidates their interconnections and relation to each other
+- What are some good search terms to search on google for this EXACT problem?
+- Please list ALL the commands in a single code block with a title + minimal yet descriptive and intuituive expalantion as a comment heading above each command. Please dont give numbers to any step or a title, just start with the first command and the first comment above it right away.
+- What are the fundamental building blocks of xxxx ? I mean, everything has fundamental building blocks. The fundamental building blocks of the python programming lanague for example are keywords, operators, objects and indentation.
+- Every techincal thing has an anatomy, for example the anatomy of an http request, or the anatomy of an ip packet. Please craft the anatomy with multiple exmaples in a similar manner as seen below, all in a single code block with a comment heading above each anatomy
+- What fields do you have to fill in, what do you must configure, what actions are you absolutely required to take by the system when X
+- Give example of 3 classic use cass that warrant the use of __ in real world, realistic scenariois and give it to me in a code block in practical steps of how to implement
+- For learning purposes, give a sentence in the strucure of "opposite of the common understanding, X does not operatore at the Y level, actually operates at the Z level by fillthisblankwithsentence" in the realm of ___ where X and Y are both sentences that include as many deeply technical words as possible.
+- What would be some simple in words yet profound insight that could lead to an "eureka!" moment in understanding ___
+- I am doing security research about ___  . What are some of the most esoteric and obscure pieces of knowledge in the realm of ___
+- The best way to leanr is to make learning fun. Give me cool pieces of trivia about ___ or fun facts about ___ or bizzare/Outlandish/Quirky/astonishing/facinating/awe-causing facts about __ 
+- Please give me a way to actively demonstrate ___ to my students with commands, tools and hands on actions so that they can experience this on their own skin. Please list all the commands in a single code block with a title + minimal explanation as a comment heading above each command. Please don't give numbers to any step or a title, just start with the first command and the first comment above it right away.
+- Please make a guide about ___ to my students with all the necessary commands, tools and hands on actions so that they can experience this on their own skin. Please list all the commands in a single code block with a title + minimal yet intuitive explanation as a comment heading above each command. Please don't give numbers to any step or a title, just start with the first command and the first comment above it right away. Make it according to the below info.
+- Please make a guide about using ___ according to the attached below documentation + common-sense/best practices for any missing pieces of info to my students with all the necessary commands, tools and hands on actions so that they can experience this on their own skin. Please list all the commands in a single code block with a title + minimal yet intuitive explanation as a comment heading above each command. Please don't give numbers to any step or a title, just start with the first command and the first comment above it right away. Make it according to the below info.
+- How to interact on the lowest level with ___
+- fill In the blank. Use as many technical and low level terms as possible as long as you don't be overly wordy and 100% accurate.
+- Make a comparison table for all the differnet __
+- Give me a statement in the structure of ___ is just a glorified/fancy ___ in the context of ___ . A few examples, a server is just a glorified PC. or a firewall is just a glorified router. A load balancer is just a glorified reverse proxy, a VPN is really just the implemention of tunneling protocols. X is basically Y wrapped in Z for added convenience.  X is an abstraction over Y, hiding all the Z. At its core, X is just Y with a layer of Z on top. Under the hood, X is really just Y but with Z slapped on. ___ is really just another word for ___
+- ____ is just an abstraction over ____ that utilizes ___ underneath
+- Give me a statement in the structure of "a X is really just the implementation of Y" for ___ and go down to the lowest relevant resolution to Y. For example "a VPN is really just the implementation of tunneling protocols." 
+- Give me 3 accurate statement in the structure of "_ is to _ what _ is to _" in the realm of X. 
+- Do you know the statements of the type "All x is y but not all y is x"? example: not all reverse proxies are load balancers but all load balancers are reverse proxies. Please provide 3 such statements in the context of ___
+- What is a concept in ___ that is analogous to or very similar to __ For example programmatic users in aws can be though of as highly analgous to non-login system account users in linux.
+- Please list all the relevant abstraction levels below ___ and about 3 abstraction layers up of ___ For example, if I were to ask you to list all abstraction layers below an if block in python and all the relevant abstraction layers above an if block in python it would like something like this: physcial silicon layout of cpu and motherboard ->  transisotrs and gates and transistor/gate level tools such as SPICE and verilog -> Register Transfer Level -> microcode -> machine code -> assembly -> bitcode - > bytecode -> JIT -> python Interpreter -> high level source code (this is the if statement itself) -> the need for the if statement (condition check) -> the explantion for the need in that specific scneario (depends on what the prgoram does) -> why the program does what it does -> why the need for the program in the first place -> why did the need occur -> what caused the thing that made the need occur occur. and so on.
+- tell me key insights and realizations throughout the conversation.
+- Create the flow in ASCII art with arrows based on these general pointers not given in any specific order.
+- What's *the* closest analog to ___ but in the realm of ___
+- what tools/techonlogies/drivers/software does it use to do that?
+- Give a sentence in the structure of "___ isn't a type of ___ but ___ is a type of" in the context of ___
+- How is x related __ me? build the connection even if it not immidetely evident
+- Organize the concepts within _____ hierarchically and logically to understand their interconnections. Map out their relationships to see how they relate to each other within the field. Do Concept Mapping/Hierarchical Taxonomy
+
+# Formatting modals
+- give where to set this in the forma of setting → settings2 -> setting-3 etc
+- resolve all inaccauries, but try to keep the wording, styling, foramtting and brefity as is
+- Please list all the commands in a single code block with a title + minimal expalantion as a comment heading above each command. Please dont give numbers to any step or a title, just start with the first command and the first comment above it right away. seprate categories by 3 spaces above and below a heading with 5 hash mars like ##### this ###### 
+- When answering, please put the entire question as the heading above the answer.
+- merge the content of your last reply with this one while removing as little content as possible from either of the replies.
+- Fix all grammartical errors and ehnace for clarity and send back. have a free hand for parapharsing:
+- For course: "send all the examples in a code block back to me separated by a an apporaite heading above each example created by you"
+- Summarize all in single paragraph. Don't leave any information out.
+- Send as 3 tables. Or as less/more. As you see fit according to the amount and type of information given.
+- Fix all grammartical errors and ehnace for clarity and send back. have a free hand for parapharsing.
+- Here is your important task for the time being: Include any missing context to the below info  Frame why each part is in here with a question in a comment. Make sure it all in a single code block with nice formatting (dont itlaciise use bold or number anything though)
+- Give 3 nice metaphors in the realm of ___
+- These additonal points you mentioned will truly give my students the upper hand over all other developers in their future! now, I have already made a paper in markdown format covering some of these concepts. Please take note of its format and style and cover these additonal points in the same format and style of explanation (: in your reply, you don't need to send the whole thing, just the continueation (:
+- Reformat the above info to fit in a paragraph but don't exclude ANY content.
+- Add expantion for the missing ones here in the same short 1-2 line bullet point format
+- humanize things. random example given for when talking about vpn: "Ah, traffic coming in on port 443 for my public IP? Forward this to my internal VPN server at private IP `10.0.0.5`."_ The VPN server then processes the packets. 
+- can u add two more pointers in the same stlye and length? of the other below entires, but one about propgation and one about assoicaiton in the transit gateway route table?
+- Please list all of these in a single code block with a single yet descriptive title as a comment heading per command. Please dont give numbers to any step or a title, just start with the first command and the first comment above it right away. No more than one comment above a command or chain of commands
+- Resend as a single bulelt point but keep the parts that were in bold in bold
+- add them here in the exact same, short, sweet, intutiouve minimal format
+- X is a varation on Y
+```bash
+resend in this format, dont leave ANY info lost during the reformat:
+# title
+- {the nubmered heading here in bold}: all bullet points, formatted as single paragraph and optmized for reading fluecny, readability and accuracy on the subject, and without removing and preivous infomration from the preivous, reply, one may only add to it, not remove from it under any circunatacme.
+
+
+repeat until done
+```
+- formatting modals
+```bash
+reformat your reply. Dont miss ANY contnet. give one code block for each, include detaile visual flow of each in linear asci arror art. it should be in this format
+
+### heading
+- one or two bullet points exlaingin,  no formatting
+- one or two bullet points expalning, no formatting
+codeblock
+# first do this
+setup,instlal tools, open software,vscdoe,c whatever
+
+# commands, if needed
+some command
+
+# more command, if beeded
+
+- visual flow here with arrows 
+
+Repeaet
+```
+```bash
+Reformat the following content into a single code block. Include all commands, comments, and visual flows exactly as they are, without missing any content. Use comments above each command to provide minimal yet descriptive explanations. Do not number any steps or provide titles; just start with the first command and the first comment right away. Do not exclude any original content; make sure not a single character of text is lost in the transition.
+
+[Insert the original content here]
+
+Repeat for all sections.
+```
+- Make an note about this concept/these concepts, give it a nice, relevant and descriptive title and follow the following formatting:
+### General
+- How can i actively demonstrate the difference between __ and __ with commands and visual outputs from actions to my students?
+- What are some of the most interesting analogies, concepts, illustrations, examples, thought experiments and thought-provoking ideas from the provided text?
+- Can you super-categorize ---- and then explain the things for which the things in that super-category are used? Also can you list out extensivily all the alternatives to --- and then compare then amongst each other? be as tehcniacl and accurate as possible to real terms used in the field.
+- dont ___ have a name for what they are? doesnt __ have a name for what it is?
+- Give practical example.
+- Give extensive list of all __
+- What does ___ consist of?
+- why is something callled x and on a scale of 1-10 how good of description is the name is for the concept it is trying to represent?
+- Give me a general syntax entry for ___ with long and descriptive variable names. For example, the general syntax for a python for loop is "for item in iterable". Another example, the general syntax for an entry in /etc/passwd is "username:passwordplaceholder:userid:groupid:,,,,:homedirectory:shellofuser "
+- What are the fundamental building blocks of xxxx ? I mean, everything has fundamental building blocks. The fundamental building blocks of the python programming language for example are keywords, operators, objects and indentation.
+- List from most used to least used
+- Fill in the blank. be detailed and specific.
+- explain ___ in 3 practical examples of varying difficulty
+
+- What was the rational for developing ___ ? is the rationale for the existence of ___ still justified today just as it was when it was first invented?
+- Give synonms for every word in ____ 
+- What are the arcane equialvents of ___ that were available in the past.
+- Whats the underlying concept that allows for this behavior?
+- Give ASCII art.
+- How can i confirm whether ___ is true? give me the content of the code/files where I can confirm this with as little non-code/non-content proof as possible
+- The "what", "why", "how", "history & etymology" and 3 varying degrees of complexity examples model.
+- how can you super-categorize ---, --- and ---- the most meaningful and specific way?
+- What are all the alternatives to ___ that are almost indistingushable it?
+- essentialy, in essence, basically, its just a, its simply a, Its merely, It only
+- Fill in the blank: so __ is generally used for the practical purpose of  ___
+- Learning is impossible without knowing about the alternatives. So what are the alternatives for __
+- Detail to me each step using as much technical terms as possible the execution flow of ___
+- What is the relationship between X and Y, How does X relate to Y in terms of \_\_\, what's the connection between X and Y 
+- behind the scences, in terms of phyiscla hardware and settigns, how does a nat gateway work? how can I set up my own nat gateway?
+- Please list out and explain the giving entities and the receiving entities in ___  and explain the differnece in data of the output vs input itself.
+
+- The best way to understand something is to ask the right questions, Can u tell me what are the right questions to ask specifically in the context of \_\_\? It has to be specific and not general such as "Why have multiple cores and not one big core in CPU "? Instead of " what are the fundamental building blocks of CPUs"?
+- Give a sentence in the structure of "Yes, its that true that X itself is Y, but ___ but in the context of ___
+- Explain choronolgically the development of ___ and why the need for __ arose
+- In which file is ___ defined? Where dab I see the source code for that? 
+- Give a title to a note containing information pertaining to (but not limited to):
+
+
+
+
+### Prompt engineering
+- **Teacher**: "You are an expert educator with extensive experience in ethical hacking and preparing students for the HTB CPTS exam. I need to determine if I can skip the upcoming lesson. To help me gauge this, please quiz me interactively based on the content I provided. Ask one question at a time, evaluating my response before moving on to the next question. Ask 5 questions that will accurately assess my understanding and determine if I am knowledgeable enough to move on. Ensure the questions are challenging and cover key concepts thoroughly. The lesson is 🏁 Firewall and IDS/IPS Evasion"
+
+
+
+
+### Meta modals
+- I make modals and store them, I define modals as short prompts or pieces of texts used to understand a concept better. In my conversation with you I realized another modal: _____ . add that modal here to the bottom of my list. Make sure ot include an example at the end.
+
+
+
+### what is this thing called
+- **Conceptual Templates** The patterns are reusable templates for exploring and understanding concepts, like "X is just a glorified Y" or "X is to Y what A is to B".
+- **Knowledge Extractors** Many of these patterns are designed to extract specific types of knowledge or understanding, like asking for fundamental building blocks or hierarchical relationships.
+- **Learning Scaffolds** These function as structured frameworks for building understanding, especially evident in patterns like "list all abstraction levels below/above X".
+- **Insight Patterns** Patterns like the "eureka moment" request or "analogous concept" questions are specifically designed to generate insights and deeper understanding.;
+- Reusable across different domains
+- Have consistent structural patterns
+- Designed to elicit specific types of understanding
+- Can be applied systematically to different topics
